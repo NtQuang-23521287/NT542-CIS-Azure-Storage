@@ -1,0 +1,171 @@
+{
+  "resource_group": "NT542-Group08",
+  "storage_accounts": [
+    {
+      "name": "stmedgroup08compliance",
+      "resource_group": "NT542-Group08",
+      "account": {
+        "accessTier": "Hot",
+        "accountMigrationInProgress": null,
+        "allowBlobPublicAccess": false,
+        "allowCrossTenantReplication": true,
+        "allowSharedKeyAccess": true,
+        "allowedCopyScope": null,
+        "azureFilesIdentityBasedAuthentication": null,
+        "blobRestoreStatus": null,
+        "creationTime": "2026-04-21T15:45:32.671885+00:00",
+        "customDomain": null,
+        "defaultToOAuthAuthentication": false,
+        "dnsEndpointType": "Standard",
+        "dualStackEndpointPreference": null,
+        "enableExtendedGroups": null,
+        "enableHttpsTrafficOnly": true,
+        "enableNfsV3": false,
+        "encryption": {
+          "encryptionIdentity": null,
+          "keySource": "Microsoft.Storage",
+          "keyVaultProperties": null,
+          "requireInfrastructureEncryption": null,
+          "services": {
+            "blob": {
+              "enabled": true,
+              "keyType": "Account",
+              "lastEnabledTime": "2026-04-21T15:45:32.782743+00:00"
+            },
+            "file": {
+              "enabled": true,
+              "keyType": "Account",
+              "lastEnabledTime": "2026-04-21T15:45:32.782743+00:00"
+            },
+            "queue": null,
+            "table": null
+          }
+        },
+        "extendedLocation": null,
+        "failoverInProgress": null,
+        "geoPriorityReplicationStatus": null,
+        "geoReplicationStats": null,
+        "id": "/subscriptions/37108e0d-2f5f-4ecd-87d8-2cd7e40efb4f/resourceGroups/NT542-Group08/providers/Microsoft.Storage/storageAccounts/stmedgroup08compliance",
+        "identity": {
+          "principalId": null,
+          "tenantId": null,
+          "type": "None",
+          "userAssignedIdentities": null
+        },
+        "immutableStorageWithVersioning": null,
+        "isHnsEnabled": false,
+        "isLocalUserEnabled": true,
+        "isSftpEnabled": false,
+        "isSkuConversionBlocked": null,
+        "keyCreationTime": {
+          "key1": "2026-04-21T15:45:32.774228+00:00",
+          "key2": "2026-04-21T15:45:32.774228+00:00"
+        },
+        "keyPolicy": null,
+        "kind": "StorageV2",
+        "largeFileSharesState": null,
+        "lastGeoFailoverTime": null,
+        "location": "eastasia",
+        "minimumTlsVersion": "TLS1_2",
+        "name": "stmedgroup08compliance",
+        "networkRuleSet": {
+          "bypass": "AzureServices",
+          "defaultAction": "Deny",
+          "ipRules": [],
+          "ipv6Rules": [],
+          "resourceAccessRules": [],
+          "virtualNetworkRules": []
+        },
+        "placement": null,
+        "primaryEndpoints": {
+          "blob": "https://stmedgroup08compliance.blob.core.windows.net/",
+          "dfs": "https://stmedgroup08compliance.dfs.core.windows.net/",
+          "file": "https://stmedgroup08compliance.file.core.windows.net/",
+          "internetEndpoints": null,
+          "ipv6Endpoints": null,
+          "microsoftEndpoints": null,
+          "queue": "https://stmedgroup08compliance.queue.core.windows.net/",
+          "table": "https://stmedgroup08compliance.table.core.windows.net/",
+          "web": "https://stmedgroup08compliance.z7.web.core.windows.net/"
+        },
+        "primaryLocation": "eastasia",
+        "privateEndpointConnections": [
+          {
+            "id": "/subscriptions/37108e0d-2f5f-4ecd-87d8-2cd7e40efb4f/resourceGroups/NT542-Group08/providers/Microsoft.Storage/storageAccounts/stmedgroup08compliance/privateEndpointConnections/stmedgroup08compliance.fd497d50-d981-4443-8d47-cd4fd800675b",
+            "name": "stmedgroup08compliance.fd497d50-d981-4443-8d47-cd4fd800675b",
+            "privateEndpoint": {
+              "id": "/subscriptions/37108e0d-2f5f-4ecd-87d8-2cd7e40efb4f/resourceGroups/NT542-Group08/providers/Microsoft.Network/privateEndpoints/nt542-blob-pe",
+              "resourceGroup": "NT542-Group08"
+            },
+            "privateLinkServiceConnectionState": {
+              "actionRequired": "None",
+              "description": "Auto-Approved",
+              "status": "Approved"
+            },
+            "provisioningState": "Succeeded",
+            "resourceGroup": "NT542-Group08",
+            "type": "Microsoft.Storage/storageAccounts/privateEndpointConnections"
+          }
+        ],
+        "provisioningState": "Succeeded",
+        "publicNetworkAccess": "Disabled",
+        "resourceGroup": "NT542-Group08",
+        "routingPreference": null,
+        "sasPolicy": null,
+        "secondaryEndpoints": null,
+        "secondaryLocation": null,
+        "sku": {
+          "name": "Standard_LRS",
+          "tier": "Standard"
+        },
+        "statusOfPrimary": "available",
+        "statusOfSecondary": null,
+        "storageAccountSkuConversionStatus": null,
+        "tags": {
+          "Environment": "dev",
+          "Group": "Group08",
+          "ManagedBy": "Terraform",
+          "Project": "NT542"
+        },
+        "type": "Microsoft.Storage/storageAccounts",
+        "zones": null
+      },
+      "blob_service": {
+        "automaticSnapshotPolicyEnabled": null,
+        "changeFeed": {
+          "enabled": false,
+          "retentionInDays": null
+        },
+        "containerDeleteRetentionPolicy": {
+          "allowPermanentDelete": null,
+          "days": 7,
+          "enabled": true
+        },
+        "cors": {
+          "corsRules": []
+        },
+        "defaultServiceVersion": null,
+        "deleteRetentionPolicy": {
+          "allowPermanentDelete": false,
+          "days": 7,
+          "enabled": true
+        },
+        "id": "/subscriptions/37108e0d-2f5f-4ecd-87d8-2cd7e40efb4f/resourceGroups/NT542-Group08/providers/Microsoft.Storage/storageAccounts/stmedgroup08compliance/blobServices/default",
+        "isVersioningEnabled": false,
+        "lastAccessTimeTrackingPolicy": null,
+        "name": "default",
+        "resourceGroup": "NT542-Group08",
+        "restorePolicy": {
+          "days": null,
+          "enabled": false,
+          "minRestoreTime": null
+        },
+        "sku": {
+          "name": "Standard_LRS",
+          "tier": "Standard"
+        },
+        "type": "Microsoft.Storage/storageAccounts/blobServices"
+      }
+    }
+  ]
+}

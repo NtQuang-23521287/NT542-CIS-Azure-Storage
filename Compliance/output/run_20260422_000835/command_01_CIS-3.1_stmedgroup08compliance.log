@@ -1,0 +1,9 @@
+status: PLANNED
+mode: dry-run
+command: storage account update --name stmedgroup08compliance --resource-group NT542-Group08 --https-only true
+returncode: None
+
+[stdout]
+
+
+[stderr]

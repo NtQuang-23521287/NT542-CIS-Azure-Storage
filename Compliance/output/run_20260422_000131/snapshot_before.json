@@ -1,0 +1,34 @@
+{
+  "resource_group": "NT542-Group08",
+  "storage_accounts": [
+    {
+      "name": "stmockgroup08",
+      "resource_group": "NT542-Group08",
+      "account": {
+        "name": "stmockgroup08",
+        "supportsHttpsTrafficOnly": false,
+        "minimumTlsVersion": "TLS1_0",
+        "publicNetworkAccess": "Enabled",
+        "networkRuleSet": {
+          "defaultAction": "Allow"
+        },
+        "allowBlobPublicAccess": true,
+        "allowCrossTenantReplication": true,
+        "encryption": {
+          "requireInfrastructureEncryption": false
+        }
+      },
+      "blob_service": {
+        "deleteRetentionPolicy": {
+          "enabled": true,
+          "days": 3
+        },
+        "containerDeleteRetentionPolicy": {
+          "enabled": false,
+          "days": 0
+        },
+        "isVersioningEnabled": false
+      }
+    }
+  ]
+}

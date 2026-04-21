@@ -1,0 +1,9 @@
+status: PLANNED
+mode: dry-run
+command: storage account blob-service-properties update --account-name stmockgroup08 --resource-group NT542-Group08 --enable-delete-retention true --delete-retention-days 7
+returncode: None
+
+[stdout]
+
+
+[stderr]

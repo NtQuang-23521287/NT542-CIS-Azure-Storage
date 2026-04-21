@@ -1,0 +1,9 @@
+status: PLANNED
+mode: dry-run
+command: storage account blob-service-properties update --account-name stmedgroup08compliance --resource-group NT542-Group08 --enable-versioning true
+returncode: None
+
+[stdout]
+
+
+[stderr]

@@ -1,0 +1,9 @@
+status: PLANNED
+mode: dry-run
+command: storage account update --name stmockgroup08 --resource-group NT542-Group08 --allow-cross-tenant-replication false
+returncode: None
+
+[stdout]
+
+
+[stderr]

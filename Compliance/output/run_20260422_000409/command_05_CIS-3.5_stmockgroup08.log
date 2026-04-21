@@ -1,0 +1,9 @@
+status: PLANNED
+mode: dry-run
+command: storage account update --name stmockgroup08 --resource-group NT542-Group08 --allow-blob-public-access false
+returncode: None
+
+[stdout]
+
+
+[stderr]

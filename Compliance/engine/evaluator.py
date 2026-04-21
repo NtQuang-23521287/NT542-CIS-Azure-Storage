@@ -49,15 +49,19 @@ def evaluate(collected_data: dict) -> dict:
     all_checks = [c for ar in account_results for c in ar["checks"]]
     total_all = len(all_checks)
     passed_all = sum(1 for c in all_checks if c["status"] == "PASS")
+    failed_all = sum(1 for c in all_checks if c["status"] == "FAIL")
+    error_all = sum(1 for c in all_checks if c["status"] == "ERROR")
 
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "resource_group": resource_group,
+        "drift_detected": failed_all > 0 or error_all > 0,
         "overall_score_pct": round(passed_all / total_all * 100, 1) if total_all > 0 else 0,
         "overall_summary": {
             "total": total_all,
             "passed": passed_all,
-            "failed": total_all - passed_all
+            "failed": failed_all,
+            "errors": error_all,
         },
-        "accounts": account_results
+        "accounts": account_results,
     }

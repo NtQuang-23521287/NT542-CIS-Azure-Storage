@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NT542 Remediation Evidence Bundle</title>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; background:#f5f5f5; color:#222; padding:24px; }
+    .card { background:#fff; border:1px solid #ddd; border-radius:12px; padding:20px; margin-bottom:16px; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; }
+    .stat { background:#fafafa; border:1px solid #eee; border-radius:10px; padding:14px; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { border-bottom:1px solid #eee; padding:10px; text-align:left; vertical-align: top; }
+    th { background:#fafafa; }
+    code { font-family: monospace; font-size:12px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>NT542 Drift Remediation Bundle</h1>
+    <p>Mode: <strong>dry-run</strong> | Resource Group: <strong>NT542-Group08</strong></p>
+  </div>
+  <div class="card">
+    <h2>Before</h2>
+    <div class="grid">
+      <div class="stat">Score: <strong>0.0%</strong></div>
+      <div class="stat">PASS: <strong>0</strong></div>
+      <div class="stat">FAIL: <strong>10</strong></div>
+      <div class="stat">ERROR: <strong>0</strong></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>After</h2>
+    <div class="grid">
+      <div class="stat">Score: <strong>N/A</strong></div>
+      <div class="stat">PASS: <strong>N/A</strong></div>
+      <div class="stat">FAIL: <strong>N/A</strong></div>
+      <div class="stat">ERROR: <strong>N/A</strong></div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Remediation Actions</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Control</th>
+          <th>Account</th>
+          <th>Mode</th>
+          <th>Status</th>
+          <th>Command</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>CIS-3.1</td>
+          <td>stmockgroup08</td>
+          <td>dry-run</td>
+          <td>PLANNED</td>
+          <td style="font-family:monospace;font-size:12px">storage account update --name stmockgroup08 --resource-group NT542-Group08 --https-only true</td>
+        </tr>
+        <tr>
+          <td>CIS-3.2</td>
+          <td>stmockgroup08</td>
+          <td>dry-run</td>
+          <td>PLANNED</td>
+          <td style="font-family:monospace;font-size:12px">storage account update --name stmockgroup08 --resource-group NT542-Group08 --min-tls-version TLS1_2</td>
+        </tr>
+        <tr>
+          <td>CIS-3.3</td>
+          <td>stmockgroup08</td>
+          <td>dry-run</td>
+          <td>PLANNED</td>
+          <td style="font-family:monospace;font-size:12px">storage account update --name stmockgroup08 --resource-group NT542-Group08 --public-network-access Disabled</td>
+        </tr>
+        <tr>
+          <td>CIS-3.4</td>
+          <td>stmockgroup08</td>
+          <td>dry-run</td>
+          <td>PLANNED</td>
+          <td style="font-family:monospace;font-size:12px">storage account update --name stmockgroup08 --resource-group NT542-Group08 --default-action Deny</td>
+        </tr>
+        <tr>
+          <td>CIS-3.5</td>
+          <td>stmockgroup08</td>
+          <td>dry-run</td>
+          <td>PLANNED</td>
+          <td style="font-family:monospace;font-size:12px">storage account update --name stmockgroup08 --resource-group NT542-Group08 --allow-blob-public-access false</td>
+        </tr>
+        <tr>
+          <td>CIS-3.8</td>
+          <td>stmockgroup08</td>
+          <td>dry-run</td>
+          <td>PLANNED</td>
+          <td style="font-family:monospace;font-size:12px">storage account blob-service-properties update --account-name stmockgroup08 --resource-group NT542-Group08 --enable-delete-retention true --delete-retention-days 7</td>
+        </tr>
+        <tr>
+          <td>CIS-3.9</td>
+          <td>stmockgroup08</td>
+          <td>dry-run</td>
+          <td>PLANNED</td>
+          <td style="font-family:monospace;font-size:12px">storage account blob-service-properties update --account-name stmockgroup08 --resource-group NT542-Group08 --enable-container-delete-retention true --container-delete-retention-days 7</td>
+        </tr>
+        <tr>
+          <td>CIS-3.10</td>
+          <td>stmockgroup08</td>
+          <td>dry-run</td>
+          <td>PLANNED</td>
+          <td style="font-family:monospace;font-size:12px">storage account blob-service-properties update --account-name stmockgroup08 --resource-group NT542-Group08 --enable-versioning true</td>
+        </tr>
+        <tr>
+          <td>CIS-3.12</td>
+          <td>stmockgroup08</td>
+          <td>dry-run</td>
+          <td>PLANNED</td>
+          <td style="font-family:monospace;font-size:12px">storage account update --name stmockgroup08 --resource-group NT542-Group08 --allow-cross-tenant-replication false</td>
+        </tr></tbody>
+    </table>
+  </div>
+  <div class="card">
+    <h2>Evidence Manifest</h2>
+    <pre>{
+  "run_dir": "/mnt/c/users/admin/downloads/nt542-cis-azure-storage/nt542-cis-azure-storage/compliance/output/run_20260422_000131",
+  "before_snapshot": "/mnt/c/users/admin/downloads/nt542-cis-azure-storage/nt542-cis-azure-storage/compliance/output/run_20260422_000131/snapshot_before.json",
+  "before_report": "/mnt/c/users/admin/downloads/nt542-cis-azure-storage/nt542-cis-azure-storage/compliance/output/run_20260422_000131/report_before.json",
+  "after_snapshot": null,
+  "after_report": null,
+  "remediation_results": [
+    {
+      "control_id": "CIS-3.1",
+      "account_name": "stmockgroup08",
+      "title": "Storage Account phải bật HTTPS only",
+      "mode": "dry-run",
+      "status": "PLANNED",
+      "description": "az storage account update --name <account> --resource-group <rg> --https-only true",
+      "command": "storage account update --name stmockgroup08 --resource-group NT542-Group08 --https-only true",
+      "returncode": null,
+      "stdout": "",
+      "stderr": "",
+      "requires_recreate": false
+    },
+    {
+      "control_id": "CIS-3.2",
+      "account_name": "stmockgroup08",
+      "title": "TLS version tối thiểu phải là 1.2",
+      "mode": "dry-run",
+      "status": "PLANNED",
+      "description": "az storage account update --name <account> --resource-group <rg> --min-tls-version TLS1_2",
+      "command": "storage account update --name stmockgroup08 --resource-group NT542-Group08 --min-tls-version TLS1_2",
+      "returncode": null,
+      "stdout": "",
+      "stderr": "",
+      "requires_recreate": false
+    },
+    {
+      "control_id": "CIS-3.3",
+      "account_name": "stmockgroup08",
+      "title": "Public network access phải bị tắt",
+      "mode": "dry-run",
+      "status": "PLANNED",
+      "description": "az storage account update --name <account> --resource-group <rg> --public-network-access Disabled",
+      "command": "storage account update --name stmockgroup08 --resource-group NT542-Group08 --public-network-access Disabled",
+      "returncode": null,
+      "stdout": "",
+      "stderr": "",
+      "requires_recreate": false
+    },
+    {
+      "control_id": "CIS-3.4",
+      "account_name": "stmockgroup08",
+      "title": "Network ACL default action phải là Deny",
+      "mode": "dry-run",
+      "status": "PLANNED",
+      "description": "az storage account update --name <account> --resource-group <rg> --default-action Deny",
+      "command": "storage account update --name stmockgroup08 --resource-group NT542-Group08 --default-action Deny",
+      "returncode": null,
+      "stdout": "",
+      "stderr": "",
+      "requires_recreate": false
+    },
+    {
+      "control_id": "CIS-3.5",
+      "account_name": "stmockgroup08",
+      "title": "Blob anonymous access phải bị tắt",
+      "mode": "dry-run",
+      "status": "PLANNED",
+      "description": "az storage account update --name <account> --resource-group <rg> --allow-blob-public-access false",
+      "command": "storage account update --name stmockgroup08 --resource-group NT542-Group08 --allow-blob-public-access false",
+      "returncode": null,
+      "stdout": "",
+      "stderr": "",
+      "requires_recreate": false
+    },
+    {
+      "control_id": "CIS-3.8",
+      "account_name": "stmockgroup08",
+      "title": "Blob soft delete phải bật và giữ >= 7 ngày",
+      "mode": "dry-run",
+      "status": "PLANNED",
+      "description": "az storage account blob-service-properties update --account-name <account> --resource-group <rg> --enable-delete-retention true --delete-retention-days 7",
+      "command": "storage account blob-service-properties update --account-name stmockgroup08 --resource-group NT542-Group08 --enable-delete-retention true --delete-retention-days 7",
+      "returncode": null,
+      "stdout": "",
+      "stderr": "",
+      "requires_recreate": false
+    },
+    {
+      "control_id": "CIS-3.9",
+      "account_name": "stmockgroup08",
+      "title": "Container soft delete phải bật và giữ >= 7 ngày",
+      "mode": "dry-run",
+      "status": "PLANNED",
+      "description": "az storage account blob-service-properties update --account-name <account> --resource-group <rg> --enable-container-delete-retention true --container-delete-retention-days 7",
+      "command": "storage account blob-service-properties update --account-name stmockgroup08 --resource-group NT542-Group08 --enable-container-delete-retention true --container-delete-retention-days 7",
+      "returncode": null,
+      "stdout": "",
+      "stderr": "",
+      "requires_recreate": false
+    },
+    {
+      "control_id": "CIS-3.10",
+      "account_name": "stmockgroup08",
+      "title": "Blob versioning phải được bật",
+      "mode": "dry-run",
+      "status": "PLANNED",
+      "description": "az storage account blob-service-properties update --account-name <account> --resource-group <rg> --enable-versioning true",
+      "command": "storage account blob-service-properties update --account-name stmockgroup08 --resource-group NT542-Group08 --enable-versioning true",
+      "returncode": null,
+      "stdout": "",
+      "stderr": "",
+      "requires_recreate": false
+    },
+    {
+      "control_id": "CIS-3.12",
+      "account_name": "stmockgroup08",
+      "title": "Cross-tenant replication phải bị tắt",
+      "mode": "dry-run",
+      "status": "PLANNED",
+      "description": "az storage account update --name <account> --resource-group <rg> --allow-cross-tenant-replication false",
+      "command": "storage account update --name stmockgroup08 --resource-group NT542-Group08 --allow-cross-tenant-replication false",
+      "returncode": null,
+      "stdout": "",
+      "stderr": "",
+      "requires_recreate": false
+    }
+  ],
+  "command_logs": [
+    "/mnt/c/users/admin/downloads/nt542-cis-azure-storage/nt542-cis-azure-storage/compliance/output/run_20260422_000131/command_01_CIS-3.1_stmockgroup08.log",
+    "/mnt/c/users/admin/downloads/nt542-cis-azure-storage/nt542-cis-azure-storage/compliance/output/run_20260422_000131/command_02_CIS-3.2_stmockgroup08.log",
+    "/mnt/c/users/admin/downloads/nt542-cis-azure-storage/nt542-cis-azure-storage/compliance/output/run_20260422_000131/command_03_CIS-3.3_stmockgroup08.log",
+    "/mnt/c/users/admin/downloads/nt542-cis-azure-storage/nt542-cis-azure-storage/compliance/output/run_20260422_000131/command_04_CIS-3.4_stmockgroup08.log",
+    "/mnt/c/users/admin/downloads/nt542-cis-azure-storage/nt542-cis-azure-storage/compliance/output/run_20260422_000131/command_05_CIS-3.5_stmockgroup08.log",
+    "/mnt/c/users/admin/downloads/nt542-cis-azure-storage/nt542-cis-azure-storage/compliance/output/run_20260422_000131/command_06_CIS-3.8_stmockgroup08.log",
+    "/mnt/c/users/admin/downloads/nt542-cis-azure-storage/nt542-cis-azure-storage/compliance/output/run_20260422_000131/command_07_CIS-3.9_stmockgroup08.log",
+    "/mnt/c/users/admin/downloads/nt542-cis-azure-storage/nt542-cis-azure-storage/compliance/output/run_20260422_000131/command_08_CIS-3.10_stmockgroup08.log",
+    "/mnt/c/users/admin/downloads/nt542-cis-azure-storage/nt542-cis-azure-storage/compliance/output/run_20260422_000131/command_09_CIS-3.12_stmockgroup08.log"
+  ]
+}</pre>
+  </div>
+</body>
+</html>

@@ -1,0 +1,270 @@
+{
+  "generated_at": "2026-04-21T17:01:31.782312+00:00",
+  "resource_group": "NT542-Group08",
+  "drift_detected": true,
+  "overall_score_pct": 0.0,
+  "overall_summary": {
+    "total": 10,
+    "passed": 0,
+    "failed": 10,
+    "errors": 0
+  },
+  "accounts": [
+    {
+      "account_name": "stmockgroup08",
+      "summary": {
+        "total": 10,
+        "passed": 0,
+        "failed": 10,
+        "errors": 0,
+        "score_pct": 0.0
+      },
+      "checks": [
+        {
+          "control_id": "CIS-3.1",
+          "title": "Storage Account phải bật HTTPS only",
+          "status": "FAIL",
+          "actual": false,
+          "expected": true,
+          "remediation": "az storage account update --name <account> --resource-group <rg> --https-only true",
+          "remediation_spec": {
+            "description": "az storage account update --name <account> --resource-group <rg> --https-only true",
+            "command_args": [
+              "storage",
+              "account",
+              "update",
+              "--name",
+              "stmockgroup08",
+              "--resource-group",
+              "NT542-Group08",
+              "--https-only",
+              "true"
+            ],
+            "requires_recreate": false
+          },
+          "account_name": "stmockgroup08"
+        },
+        {
+          "control_id": "CIS-3.2",
+          "title": "TLS version tối thiểu phải là 1.2",
+          "status": "FAIL",
+          "actual": "TLS1_0",
+          "expected": "TLS1_2",
+          "remediation": "az storage account update --name <account> --resource-group <rg> --min-tls-version TLS1_2",
+          "remediation_spec": {
+            "description": "az storage account update --name <account> --resource-group <rg> --min-tls-version TLS1_2",
+            "command_args": [
+              "storage",
+              "account",
+              "update",
+              "--name",
+              "stmockgroup08",
+              "--resource-group",
+              "NT542-Group08",
+              "--min-tls-version",
+              "TLS1_2"
+            ],
+            "requires_recreate": false
+          },
+          "account_name": "stmockgroup08"
+        },
+        {
+          "control_id": "CIS-3.3",
+          "title": "Public network access phải bị tắt",
+          "status": "FAIL",
+          "actual": "Enabled",
+          "expected": "Disabled",
+          "remediation": "az storage account update --name <account> --resource-group <rg> --public-network-access Disabled",
+          "remediation_spec": {
+            "description": "az storage account update --name <account> --resource-group <rg> --public-network-access Disabled",
+            "command_args": [
+              "storage",
+              "account",
+              "update",
+              "--name",
+              "stmockgroup08",
+              "--resource-group",
+              "NT542-Group08",
+              "--public-network-access",
+              "Disabled"
+            ],
+            "requires_recreate": false
+          },
+          "account_name": "stmockgroup08"
+        },
+        {
+          "control_id": "CIS-3.4",
+          "title": "Network ACL default action phải là Deny",
+          "status": "FAIL",
+          "actual": "Allow",
+          "expected": "Deny",
+          "remediation": "az storage account update --name <account> --resource-group <rg> --default-action Deny",
+          "remediation_spec": {
+            "description": "az storage account update --name <account> --resource-group <rg> --default-action Deny",
+            "command_args": [
+              "storage",
+              "account",
+              "update",
+              "--name",
+              "stmockgroup08",
+              "--resource-group",
+              "NT542-Group08",
+              "--default-action",
+              "Deny"
+            ],
+            "requires_recreate": false
+          },
+          "account_name": "stmockgroup08"
+        },
+        {
+          "control_id": "CIS-3.5",
+          "title": "Blob anonymous access phải bị tắt",
+          "status": "FAIL",
+          "actual": true,
+          "expected": false,
+          "remediation": "az storage account update --name <account> --resource-group <rg> --allow-blob-public-access false",
+          "remediation_spec": {
+            "description": "az storage account update --name <account> --resource-group <rg> --allow-blob-public-access false",
+            "command_args": [
+              "storage",
+              "account",
+              "update",
+              "--name",
+              "stmockgroup08",
+              "--resource-group",
+              "NT542-Group08",
+              "--allow-blob-public-access",
+              "false"
+            ],
+            "requires_recreate": false
+          },
+          "account_name": "stmockgroup08"
+        },
+        {
+          "control_id": "CIS-3.8",
+          "title": "Blob soft delete phải bật và giữ >= 7 ngày",
+          "status": "FAIL",
+          "actual": {
+            "enabled": true,
+            "days": 3
+          },
+          "expected": {
+            "enabled": true,
+            "days": ">=7"
+          },
+          "remediation": "az storage account blob-service-properties update --account-name <account> --resource-group <rg> --enable-delete-retention true --delete-retention-days 7",
+          "remediation_spec": {
+            "description": "az storage account blob-service-properties update --account-name <account> --resource-group <rg> --enable-delete-retention true --delete-retention-days 7",
+            "command_args": [
+              "storage",
+              "account",
+              "blob-service-properties",
+              "update",
+              "--account-name",
+              "stmockgroup08",
+              "--resource-group",
+              "NT542-Group08",
+              "--enable-delete-retention",
+              "true",
+              "--delete-retention-days",
+              "7"
+            ],
+            "requires_recreate": false
+          },
+          "account_name": "stmockgroup08"
+        },
+        {
+          "control_id": "CIS-3.9",
+          "title": "Container soft delete phải bật và giữ >= 7 ngày",
+          "status": "FAIL",
+          "actual": {
+            "enabled": false,
+            "days": 0
+          },
+          "expected": {
+            "enabled": true,
+            "days": ">=7"
+          },
+          "remediation": "az storage account blob-service-properties update --account-name <account> --resource-group <rg> --enable-container-delete-retention true --container-delete-retention-days 7",
+          "remediation_spec": {
+            "description": "az storage account blob-service-properties update --account-name <account> --resource-group <rg> --enable-container-delete-retention true --container-delete-retention-days 7",
+            "command_args": [
+              "storage",
+              "account",
+              "blob-service-properties",
+              "update",
+              "--account-name",
+              "stmockgroup08",
+              "--resource-group",
+              "NT542-Group08",
+              "--enable-container-delete-retention",
+              "true",
+              "--container-delete-retention-days",
+              "7"
+            ],
+            "requires_recreate": false
+          },
+          "account_name": "stmockgroup08"
+        },
+        {
+          "control_id": "CIS-3.10",
+          "title": "Blob versioning phải được bật",
+          "status": "FAIL",
+          "actual": false,
+          "expected": true,
+          "remediation": "az storage account blob-service-properties update --account-name <account> --resource-group <rg> --enable-versioning true",
+          "remediation_spec": {
+            "description": "az storage account blob-service-properties update --account-name <account> --resource-group <rg> --enable-versioning true",
+            "command_args": [
+              "storage",
+              "account",
+              "blob-service-properties",
+              "update",
+              "--account-name",
+              "stmockgroup08",
+              "--resource-group",
+              "NT542-Group08",
+              "--enable-versioning",
+              "true"
+            ],
+            "requires_recreate": false
+          },
+          "account_name": "stmockgroup08"
+        },
+        {
+          "control_id": "CIS-3.11",
+          "title": "Infrastructure encryption phải được bật",
+          "status": "FAIL",
+          "actual": false,
+          "expected": true,
+          "remediation": "Không thể bật sau khi tạo — phải tạo lại storage account với infrastructure_encryption_enabled = true trong Terraform",
+          "account_name": "stmockgroup08"
+        },
+        {
+          "control_id": "CIS-3.12",
+          "title": "Cross-tenant replication phải bị tắt",
+          "status": "FAIL",
+          "actual": true,
+          "expected": false,
+          "remediation": "az storage account update --name <account> --resource-group <rg> --allow-cross-tenant-replication false",
+          "remediation_spec": {
+            "description": "az storage account update --name <account> --resource-group <rg> --allow-cross-tenant-replication false",
+            "command_args": [
+              "storage",
+              "account",
+              "update",
+              "--name",
+              "stmockgroup08",
+              "--resource-group",
+              "NT542-Group08",
+              "--allow-cross-tenant-replication",
+              "false"
+            ],
+            "requires_recreate": false
+          },
+          "account_name": "stmockgroup08"
+        }
+      ]
+    }
+  ]
+}
