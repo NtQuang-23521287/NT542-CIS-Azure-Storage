@@ -62,6 +62,59 @@ variable "vpn_generation" {
   default     = "Generation1"
 }
 
+variable "vpn_gateway_public_ip_zones" {
+  description = "Availability zones for the VPN Gateway Standard Public IP"
+  type        = list(string)
+  default     = ["1", "2", "3"]
+}
+
+variable "vpn_type" {
+  description = "VPN Gateway type: RouteBased or PolicyBased"
+  type        = string
+  default     = "RouteBased"
+}
+
+variable "vpn_client_address_space" {
+  description = "Client address pool for Point-to-Site VPN. Used only when vpn_client_root_certificate_data is set."
+  type        = list(string)
+  default     = ["172.16.0.0/24"]
+}
+
+variable "vpn_client_root_certificate_name" {
+  description = "Name for the Point-to-Site VPN root certificate"
+  type        = string
+  default     = "p2s-root-cert"
+}
+
+variable "vpn_client_root_certificate_data" {
+  description = "Base64 public root certificate data for Point-to-Site VPN. Leave empty to create only the gateway."
+  type        = string
+  default     = ""
+}
+
+variable "vm_size" {
+  description = "Size for the management Linux VM"
+  type        = string
+  default     = "Standard_DS1_v2"
+}
+
+variable "vm_admin_username" {
+  description = "Admin username for the management Linux VM"
+  type        = string
+  default     = "azureuser"
+}
+
+variable "vm_admin_ssh_public_key" {
+  description = "SSH public key used to access the management Linux VM"
+  type        = string
+}
+
+variable "vm_ssh_source_address_prefix" {
+  description = "Source IP/CIDR allowed to SSH to the management Linux VM. Use your public IP with /32 for better security."
+  type        = string
+  default     = "*"
+}
+
 # ── Storage ───────────────────────────────────────────────────────────────────
 
 variable "storage_account_name" {

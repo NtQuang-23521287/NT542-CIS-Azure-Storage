@@ -7,9 +7,10 @@ resource "azurerm_storage_account" "sa" {
   resource_group_name = data.azurerm_resource_group.rg.name
   location            = var.location
 
-  account_tier             = var.storage_tier        # "Standard"
-  account_replication_type = var.storage_replication # "LRS"
-  account_kind             = "StorageV2"
+  account_tier                      = var.storage_tier        # "Standard"
+  account_replication_type          = var.storage_replication # "LRS"
+  account_kind                      = "StorageV2"
+  infrastructure_encryption_enabled = true
 
   # ── Security requirements ──────────────────────────────────────────────────
   # CIS Azure 3.1  – require HTTPS

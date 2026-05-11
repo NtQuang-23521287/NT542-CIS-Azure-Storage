@@ -32,6 +32,52 @@ output "subnet_private_endpoint_id" {
   value       = azurerm_subnet.private_endpoint.id
 }
 
+output "vpn_gateway_id" {
+  description = "Resource ID of the VPN Gateway"
+  value       = azurerm_virtual_network_gateway.vpn.id
+}
+
+output "vpn_gateway_public_ip" {
+  description = "Public IP address assigned to the VPN Gateway"
+  value       = azurerm_public_ip.vpn_gateway.ip_address
+}
+
+output "management_vm_id" {
+  description = "Resource ID of the management Linux VM"
+  value       = azurerm_linux_virtual_machine.management.id
+}
+
+output "management_vm_private_ip" {
+  description = "Private IP address of the management Linux VM"
+  value       = azurerm_network_interface.management_vm.private_ip_address
+}
+
+output "management_vm_public_ip" {
+  description = "Public IP address of the management Linux VM"
+  value       = azurerm_public_ip.management_vm.ip_address
+}
+
+output "management_vm_ssh_command" {
+  description = "SSH command for the management Linux VM"
+  value       = "ssh ${var.vm_admin_username}@${azurerm_public_ip.management_vm.ip_address}"
+}
+
+output "deployment_complete_summary" {
+  description = "Summary printed after Terraform finishes creating the lab resources"
+  value = {
+    status                    = "Deployment complete"
+    resource_group            = data.azurerm_resource_group.rg.name
+    vpn_gateway_name          = azurerm_virtual_network_gateway.vpn.name
+    vpn_gateway_public_ip     = azurerm_public_ip.vpn_gateway.ip_address
+    management_vm_name        = azurerm_linux_virtual_machine.management.name
+    management_vm_private_ip  = azurerm_network_interface.management_vm.private_ip_address
+    management_vm_public_ip   = azurerm_public_ip.management_vm.ip_address
+    management_vm_ssh_command = "ssh ${var.vm_admin_username}@${azurerm_public_ip.management_vm.ip_address}"
+    storage_account_name      = azurerm_storage_account.sa.name
+    private_endpoint_ip       = azurerm_private_endpoint.blob_pe.private_service_connection[0].private_ip_address
+  }
+}
+
 output "storage_account_id" {
   description = "Resource ID of the Storage Account"
   value       = azurerm_storage_account.sa.id
