@@ -41,7 +41,9 @@ resource "azurerm_storage_account" "sa" {
   resource_group_name             = azurerm_resource_group.rg.name
   location                        = azurerm_resource_group.rg.location
   account_tier                    = "Standard"
-  account_replication_type        = "LRS"
+  
+  account_replication_type        = "GRS"
+
   account_kind                    = "StorageV2"
 
   https_traffic_only_enabled      = true
@@ -99,4 +101,11 @@ resource "azurerm_private_endpoint" "storage_blob_pe" {
     name                 = "blob-dns-zone-group"
     private_dns_zone_ids = [azurerm_private_dns_zone.blob_dns.id]
   }
+}
+
+resource "azurerm_management_lock" "sa_lock" {
+  name       = "Khoa-Chong-Xoa-Storage-Benh-Vien"
+  scope      = azurerm_storage_account.sa.id
+  lock_level = "CanNotDelete"
+  notes      = "Bảo vệ kho dữ liệu y tế. Không được phép xóa!"
 }

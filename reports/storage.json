@@ -1,0 +1,124 @@
+{
+  "accessTier": "Hot",
+  "accountMigrationInProgress": null,
+  "allowBlobPublicAccess": true,
+  "allowCrossTenantReplication": false,
+  "allowSharedKeyAccess": false,
+  "allowedCopyScope": null,
+  "azureFilesIdentityBasedAuthentication": null,
+  "blobRestoreStatus": null,
+  "creationTime": "2026-03-31T05:16:08.428486+00:00",
+  "customDomain": null,
+  "defaultToOAuthAuthentication": false,
+  "dnsEndpointType": "Standard",
+  "dualStackEndpointPreference": null,
+  "enableExtendedGroups": null,
+  "enableHttpsTrafficOnly": true,
+  "enableNfsV3": false,
+  "encryption": {
+    "encryptionIdentity": null,
+    "keySource": "Microsoft.Storage",
+    "keyVaultProperties": null,
+    "requireInfrastructureEncryption": true,
+    "services": {
+      "blob": {
+        "enabled": true,
+        "keyType": "Account",
+        "lastEnabledTime": "2026-03-31T05:16:08.600371+00:00"
+      },
+      "file": {
+        "enabled": true,
+        "keyType": "Account",
+        "lastEnabledTime": "2026-03-31T05:16:08.600371+00:00"
+      },
+      "queue": null,
+      "table": null
+    }
+  },
+  "extendedLocation": null,
+  "failoverInProgress": null,
+  "geoPriorityReplicationStatus": null,
+  "geoReplicationStats": null,
+  "id": "/subscriptions/1e8224ff-8bce-4ffc-9282-fd7a1921ea88/resourceGroups/rg-hospital-cis/providers/Microsoft.Storage/storageAccounts/sthospitalcis001",
+  "identity": {
+    "principalId": null,
+    "tenantId": null,
+    "type": "None",
+    "userAssignedIdentities": null
+  },
+  "immutableStorageWithVersioning": null,
+  "isHnsEnabled": false,
+  "isLocalUserEnabled": true,
+  "isSftpEnabled": false,
+  "isSkuConversionBlocked": null,
+  "keyCreationTime": {
+    "key1": "2026-03-31T05:16:08.600371+00:00",
+    "key2": "2026-03-31T05:16:08.600371+00:00"
+  },
+  "keyPolicy": null,
+  "kind": "StorageV2",
+  "largeFileSharesState": null,
+  "lastGeoFailoverTime": null,
+  "location": "southeastasia",
+  "minimumTlsVersion": "TLS1_2",
+  "name": "sthospitalcis001",
+  "networkRuleSet": {
+    "bypass": "AzureServices",
+    "defaultAction": "Allow",
+    "ipRules": [],
+    "ipv6Rules": [],
+    "resourceAccessRules": [],
+    "virtualNetworkRules": []
+  },
+  "placement": null,
+  "primaryEndpoints": {
+    "blob": "https://sthospitalcis001.blob.core.windows.net/",
+    "dfs": "https://sthospitalcis001.dfs.core.windows.net/",
+    "file": "https://sthospitalcis001.file.core.windows.net/",
+    "internetEndpoints": null,
+    "ipv6Endpoints": null,
+    "microsoftEndpoints": null,
+    "queue": "https://sthospitalcis001.queue.core.windows.net/",
+    "table": "https://sthospitalcis001.table.core.windows.net/",
+    "web": "https://sthospitalcis001.z23.web.core.windows.net/"
+  },
+  "primaryLocation": "southeastasia",
+  "privateEndpointConnections": [
+    {
+      "id": "/subscriptions/1e8224ff-8bce-4ffc-9282-fd7a1921ea88/resourceGroups/rg-hospital-cis/providers/Microsoft.Storage/storageAccounts/sthospitalcis001/privateEndpointConnections/sthospitalcis001.43e0ba9e-018f-46f8-816a-cfe02402d8a0",
+      "name": "sthospitalcis001.43e0ba9e-018f-46f8-816a-cfe02402d8a0",
+      "privateEndpoint": {
+        "id": "/subscriptions/1e8224ff-8bce-4ffc-9282-fd7a1921ea88/resourceGroups/rg-hospital-cis/providers/Microsoft.Network/privateEndpoints/pe-storage-blob",
+        "resourceGroup": "rg-hospital-cis"
+      },
+      "privateLinkServiceConnectionState": {
+        "actionRequired": "None",
+        "description": "Auto-Approved",
+        "status": "Approved"
+      },
+      "provisioningState": "Succeeded",
+      "resourceGroup": "rg-hospital-cis",
+      "type": "Microsoft.Storage/storageAccounts/privateEndpointConnections"
+    }
+  ],
+  "provisioningState": "Succeeded",
+  "publicNetworkAccess": "Disabled",
+  "resourceGroup": "rg-hospital-cis",
+  "routingPreference": null,
+  "sasPolicy": null,
+  "secondaryEndpoints": null,
+  "secondaryLocation": null,
+  "sku": {
+    "name": "Standard_LRS",
+    "tier": "Standard"
+  },
+  "statusOfPrimary": "available",
+  "statusOfSecondary": null,
+  "storageAccountSkuConversionStatus": null,
+  "tags": {
+    "env": "lab",
+    "project": "hospital-cis"
+  },
+  "type": "Microsoft.Storage/storageAccounts",
+  "zones": null
+}

@@ -1,0 +1,36 @@
+{
+  "automaticSnapshotPolicyEnabled": null,
+  "changeFeed": {
+    "enabled": false,
+    "retentionInDays": null
+  },
+  "containerDeleteRetentionPolicy": {
+    "allowPermanentDelete": null,
+    "days": 14,
+    "enabled": true
+  },
+  "cors": {
+    "corsRules": []
+  },
+  "defaultServiceVersion": null,
+  "deleteRetentionPolicy": {
+    "allowPermanentDelete": false,
+    "days": 14,
+    "enabled": true
+  },
+  "id": "/subscriptions/1e8224ff-8bce-4ffc-9282-fd7a1921ea88/resourceGroups/rg-hospital-cis/providers/Microsoft.Storage/storageAccounts/sthospitalcis001/blobServices/default",
+  "isVersioningEnabled": true,
+  "lastAccessTimeTrackingPolicy": null,
+  "name": "default",
+  "resourceGroup": "rg-hospital-cis",
+  "restorePolicy": {
+    "days": null,
+    "enabled": false,
+    "minRestoreTime": null
+  },
+  "sku": {
+    "name": "Standard_LRS",
+    "tier": "Standard"
+  },
+  "type": "Microsoft.Storage/storageAccounts/blobServices"
+}
