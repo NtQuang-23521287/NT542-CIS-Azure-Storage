@@ -67,7 +67,7 @@ variable "vpn_generation" {
 variable "storage_account_name" {
   description = "Globally unique storage account name (3–24 lowercase alphanumeric)"
   type        = string
-  default     = "stmedgroup08compliance"
+  default     = "group08compliance120526"
 }
 
 variable "storage_tier" {

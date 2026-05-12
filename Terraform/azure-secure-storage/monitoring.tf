@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# monitoring.tf  –  Log Analytics Workspace + Diagnostic Settings
+# monitoring.tf  -  Log Analytics Workspace + Diagnostic Settings
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── Log Analytics Workspace ───────────────────────────────────────────────────

@@ -1,67 +1,53 @@
-from engine.rules import ALL_RULES
-from datetime import datetime, timezone
+"""
+evaluator.py – So sánh cấu hình thực tế với cấu hình mong muốn.
+
+Mỗi vấn đề được gắn mức độ nghiêm trọng:
+  - CRITICAL : tự động sửa ngay, không cần admin xác nhận
+  - WARNING  : hỏi admin trước khi sửa
+"""
+
+# ── Định nghĩa mức độ nghiêm trọng cho từng loại vi phạm ─────────────────────
+SEVERITY = {
+    "HTTPS traffic only setting mismatch":  "CRITICAL",
+    "Minimum TLS version mismatch":         "CRITICAL",
+    "Public Network Access mismatch":       "CRITICAL",   # kịch bản 2 – nguy hiểm
+    "Blob versioning disabled":             "WARNING",    # kịch bản 1 – cần xác nhận
+}
 
 
-def evaluate(collected_data: dict) -> dict:
-    accounts = collected_data.get("storage_accounts", [])
-    resource_group = collected_data.get("resource_group", "unknown")
+def evaluate_config(actual_config: dict, expected_config: dict):
+    """
+    So sánh actual vs expected.
 
-    account_results = []
+    Trả về:
+        drift_detected (bool)
+        issues         (list[dict])  –  mỗi phần tử: {"name": str, "severity": str}
+    """
+    drift_detected = False
+    issues = []
 
-    for entry in accounts:
-        account_name = entry.get("name", "unknown")
-        checks = []
-
-        for rule_fn in ALL_RULES:
-            try:
-                result = rule_fn(entry)
-                result["account_name"] = account_name
-                checks.append(result)
-            except Exception as e:
-                checks.append({
-                    "control_id": rule_fn.__name__,
-                    "title": rule_fn.__doc__ or rule_fn.__name__,
-                    "status": "ERROR",
-                    "actual": None,
-                    "expected": None,
-                    "remediation": f"Lỗi khi chạy rule: {e}",
-                    "account_name": account_name
-                })
-
-        total = len(checks)
-        passed = sum(1 for c in checks if c["status"] == "PASS")
-        failed = sum(1 for c in checks if c["status"] == "FAIL")
-        errors = sum(1 for c in checks if c["status"] == "ERROR")
-        score = round(passed / total * 100, 1) if total > 0 else 0
-
-        account_results.append({
-            "account_name": account_name,
-            "summary": {
-                "total": total,
-                "passed": passed,
-                "failed": failed,
-                "errors": errors,
-                "score_pct": score
-            },
-            "checks": checks
+    def add_issue(name: str):
+        nonlocal drift_detected
+        drift_detected = True
+        issues.append({
+            "name":     name,
+            "severity": SEVERITY.get(name, "WARNING"),
         })
 
-    all_checks = [c for ar in account_results for c in ar["checks"]]
-    total_all = len(all_checks)
-    passed_all = sum(1 for c in all_checks if c["status"] == "PASS")
-    failed_all = sum(1 for c in all_checks if c["status"] == "FAIL")
-    error_all = sum(1 for c in all_checks if c["status"] == "ERROR")
+    # ── Account-level checks ──────────────────────────────────────────────────
 
-    return {
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "resource_group": resource_group,
-        "drift_detected": failed_all > 0 or error_all > 0,
-        "overall_score_pct": round(passed_all / total_all * 100, 1) if total_all > 0 else 0,
-        "overall_summary": {
-            "total": total_all,
-            "passed": passed_all,
-            "failed": failed_all,
-            "errors": error_all,
-        },
-        "accounts": account_results,
-    }
+    if actual_config["https_only"] != expected_config["https_only"]:
+        add_issue("HTTPS traffic only setting mismatch")
+
+    if actual_config["min_tls_version"] != expected_config["min_tls_version"]:
+        add_issue("Minimum TLS version mismatch")
+
+    if actual_config["public_network_access"] != expected_config["public_network_access"]:
+        add_issue("Public Network Access mismatch")
+
+    # ── Blob-service-level checks ─────────────────────────────────────────────
+
+    if actual_config.get("versioning_enabled") != expected_config.get("versioning_enabled"):
+        add_issue("Blob versioning disabled")
+
+    return drift_detected, issues

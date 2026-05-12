@@ -5,3 +5,12 @@
 crash.log
 *.tfvars
 *.tfplan
+/Compliance/engine/.env
+/Compliance/engine/logs/
+/Compliance/data/
+/Terraform/azure-secure-storage/.terraform/
+/Terraform/azure-secure-storage/terraform.tfstate
+/Terraform/azure-secure-storage/terraform.tfstate.backup
+/Terraform/azure-secure-storage/.terraform.lock.hcl
+/Terraform/azure-secure-storage/.terraform/
+/Terraform/azure-secure-storage/azure/
