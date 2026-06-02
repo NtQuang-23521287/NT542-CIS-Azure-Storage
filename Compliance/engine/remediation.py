@@ -37,6 +37,47 @@ REMEDIATION_COMMANDS = {
         "--resource-group {rg} "
         "--enable-versioning true"
     ),
+    "Key Vault Public Network Access mismatch": (
+        "az keyvault update "
+        "--name {account} "
+        "--resource-group {rg} "
+        "--public-network-access Disabled"
+    ),
+    "Key Vault RBAC authorization disabled": (
+        "az keyvault update "
+        "--name {account} "
+        "--resource-group {rg} "
+        "--enable-rbac-authorization true"
+    ),
+    "Key Vault recoverability mismatch": (
+        "az keyvault update "
+        "--name {account} "
+        "--resource-group {rg} "
+        "--enable-purge-protection true"
+    ),
+    "SQL auditing disabled": (
+        "az sql server audit-policy update "
+        "--resource-group {rg} "
+        "--name {account} "
+        "--state Enabled"
+    ),
+    "Microsoft Defender for SQL disabled": (
+        "az security pricing create "
+        "--name SqlServers "
+        "--tier Standard"
+    ),
+    "SQL Minimum TLS version mismatch": (
+        "az sql server update "
+        "--name {account} "
+        "--resource-group {rg} "
+        "--minimal-tls-version 1.2"
+    ),
+    "SQL Public Network Access mismatch": (
+        "az sql server update "
+        "--name {account} "
+        "--resource-group {rg} "
+        "--enable-public-network false"
+    ),
 }
 
 # ── Màu ANSI để in terminal dễ đọc ───────────────────────────────────────────
@@ -86,7 +127,12 @@ def remediate_config(
 
         cmd_template = REMEDIATION_COMMANDS.get(name)
         if not cmd_template:
-            logging.warning(f"[REMEDIATION] Không có lệnh sửa cho: {name}")
+            msg = (
+                f"[REMEDIATION] Khong co lenh tu dong cho: {name}. "
+                "Can xu ly thu cong hoac bo sung tham so identity/network."
+            )
+            print(f"{YELLOW}  -> {msg}{RESET}")
+            logging.warning(msg)
             continue
 
         cmd = cmd_template.format(account=storage_account_name, rg=resource_group)

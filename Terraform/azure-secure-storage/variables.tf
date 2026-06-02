@@ -1,13 +1,13 @@
 variable "resource_group_name" {
   description = "Name of the Azure Resource Group"
   type        = string
-  default     = "NT542-Group08"
+  default     = "NT542-Group08_Automation"
 }
 
 variable "location" {
   description = "Azure region to deploy resources"
   type        = string
-  default     = "eastasia"
+  default     = "East US"
 }
 
 variable "project" {
@@ -80,6 +80,48 @@ variable "storage_replication" {
   description = "Replication type: LRS | GRS | ZRS | GZRS"
   type        = string
   default     = "LRS"
+}
+
+variable "key_vault_name" {
+  description = "Globally unique Key Vault name"
+  type        = string
+  default     = "nt542-kv-group08-120526"
+}
+
+variable "key_vault_sku" {
+  description = "Key Vault SKU: standard or premium"
+  type        = string
+  default     = "standard"
+}
+
+variable "key_vault_soft_delete_retention_days" {
+  description = "Soft delete retention period for Key Vault"
+  type        = number
+  default     = 7
+}
+
+variable "sql_server_name" {
+  description = "Globally unique Azure SQL logical server name"
+  type        = string
+  default     = "nt542-sqlserver-group08"
+}
+
+variable "sql_database_name" {
+  description = "Azure SQL Database name"
+  type        = string
+  default     = "nt542-sqldb"
+}
+
+variable "sql_admin_login" {
+  description = "SQL administrator login used during server creation"
+  type        = string
+  default     = "nt542sqladmin"
+}
+
+variable "sql_database_sku" {
+  description = "Azure SQL Database SKU"
+  type        = string
+  default     = "Basic"
 }
 
 # ── Log Analytics ─────────────────────────────────────────────────────────────

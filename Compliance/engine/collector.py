@@ -3,6 +3,8 @@ from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.storage import StorageManagementClient
 import logging
 import os
+import json
+import subprocess
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -52,3 +54,108 @@ def collect_storage_account_config(storage_client, resource_group, storage_accou
     }
 
     return config
+
+
+def _run_az_json(args: list[str]):
+    """Run an Azure CLI command and parse its JSON output."""
+    command = ["az", *args, "--output", "json"]
+    logging.info("[COLLECTOR] Running Azure CLI: %s", " ".join(command))
+    result = subprocess.run(command, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+    if not result.stdout.strip():
+        return None
+    return json.loads(result.stdout)
+
+
+def _has_private_endpoint(resource_group: str, resource_name: str, resource_type: str) -> bool:
+    connections = _run_az_json([
+        "network",
+        "private-endpoint-connection",
+        "list",
+        "--resource-group",
+        resource_group,
+        "--name",
+        resource_name,
+        "--type",
+        resource_type,
+    ])
+    return any(
+        (conn.get("privateLinkServiceConnectionState") or {}).get("status") == "Approved"
+        for conn in connections or []
+    )
+
+
+def collect_key_vault_config(resource_group: str, key_vault_name: str):
+    """Collect Key Vault settings required by the CIS checks."""
+    vault = _run_az_json([
+        "keyvault",
+        "show",
+        "--resource-group",
+        resource_group,
+        "--name",
+        key_vault_name,
+    ])
+    keys = _run_az_json(["keyvault", "key", "list", "--vault-name", key_vault_name])
+    secrets = _run_az_json(["keyvault", "secret", "list", "--vault-name", key_vault_name])
+
+    return {
+        "public_network_access": vault.get("properties", {}).get("publicNetworkAccess"),
+        "enable_rbac_authorization": vault.get("properties", {}).get("enableRbacAuthorization"),
+        "enable_purge_protection": vault.get("properties", {}).get("enablePurgeProtection"),
+        "enable_soft_delete": vault.get("properties", {}).get("enableSoftDelete"),
+        "private_endpoint_enabled": _has_private_endpoint(
+            resource_group,
+            key_vault_name,
+            "Microsoft.KeyVault/vaults",
+        ),
+        "keys_have_expiry": all((item.get("attributes") or {}).get("expires") for item in keys or []),
+        "secrets_have_expiry": all((item.get("attributes") or {}).get("expires") for item in secrets or []),
+    }
+
+
+def collect_sql_config(resource_group: str, sql_server_name: str):
+    """Collect Azure SQL Server settings required by the CIS checks."""
+    server = _run_az_json([
+        "sql",
+        "server",
+        "show",
+        "--resource-group",
+        resource_group,
+        "--name",
+        sql_server_name,
+    ])
+    auditing = _run_az_json([
+        "sql",
+        "server",
+        "audit-policy",
+        "show",
+        "--resource-group",
+        resource_group,
+        "--name",
+        sql_server_name,
+    ])
+    ad_admins = _run_az_json([
+        "sql",
+        "server",
+        "ad-admin",
+        "list",
+        "--resource-group",
+        resource_group,
+        "--server",
+        sql_server_name,
+    ])
+    defender = _run_az_json(["security", "pricing", "show", "--name", "SqlServers"])
+
+    return {
+        "auditing_enabled": auditing.get("state") == "Enabled",
+        "defender_enabled": defender.get("pricingTier") == "Standard",
+        "min_tls_version": server.get("minimalTlsVersion"),
+        "public_network_access": server.get("publicNetworkAccess"),
+        "private_endpoint_enabled": _has_private_endpoint(
+            resource_group,
+            sql_server_name,
+            "Microsoft.Sql/servers",
+        ),
+        "azure_ad_admin_configured": bool(ad_admins),
+    }

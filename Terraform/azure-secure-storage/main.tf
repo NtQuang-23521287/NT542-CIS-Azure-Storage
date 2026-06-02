@@ -4,8 +4,8 @@
 
 # Tạo Resource Group
 resource "azurerm_resource_group" "rg" {
-  name     = "NT542-Group08_Automation"
-  location = "East US"
+  name     = var.resource_group_name
+  location = var.location
 }
 
 # Data resource để tham chiếu đến Resource Group đã tạo
