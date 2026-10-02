@@ -5,7 +5,9 @@ import logging
 import os
 import json
 import subprocess
+import shutil
 from dotenv import load_dotenv
+from config import SECURITY_SIGNALS_FILE
 load_dotenv()
 
 
@@ -58,14 +60,18 @@ def collect_storage_account_config(storage_client, resource_group, storage_accou
 
 def _run_az_json(args: list[str]):
     """Run an Azure CLI command and parse its JSON output."""
-    command = ["az", *args, "--output", "json"]
+    az_cli = shutil.which("az") or shutil.which("az.cmd") or shutil.which("az.exe")
+    if not az_cli:
+        raise RuntimeError("Azure CLI was not found in PATH. Install Azure CLI or restart the terminal.")
+
+    command = [az_cli, *args, "--output", "json"]
     logging.info("[COLLECTOR] Running Azure CLI: %s", " ".join(command))
     result = subprocess.run(command, capture_output=True, text=True)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or result.stdout.strip())
     if not result.stdout.strip():
         return None
-    return json.loads(result.stdout)
+    return json.loads(result.stdout.lstrip("\ufeff"))
 
 
 def _has_private_endpoint(resource_group: str, resource_name: str, resource_type: str) -> bool:
@@ -80,10 +86,38 @@ def _has_private_endpoint(resource_group: str, resource_name: str, resource_type
         "--type",
         resource_type,
     ])
-    return any(
-        (conn.get("privateLinkServiceConnectionState") or {}).get("status") == "Approved"
-        for conn in connections or []
-    )
+    for conn in connections or []:
+        state = conn.get("privateLinkServiceConnectionState") or (
+            conn.get("properties", {}).get("privateLinkServiceConnectionState")
+        ) or {}
+        if str(state.get("status", "")).lower() == "approved":
+            return True
+
+    # Some Azure CLI resource providers return incomplete connection objects.
+    # Fall back to scanning Private Endpoints in the resource group and matching
+    # the target private link service ID.
+    private_endpoints = _run_az_json([
+        "network",
+        "private-endpoint",
+        "list",
+        "--resource-group",
+        resource_group,
+    ])
+    target_fragment = f"/providers/{resource_type}/{resource_name}".lower()
+
+    for private_endpoint in private_endpoints or []:
+        connections = (
+            private_endpoint.get("privateLinkServiceConnections")
+            or private_endpoint.get("properties", {}).get("privateLinkServiceConnections")
+            or []
+        )
+        for connection in connections:
+            properties = connection.get("properties", connection)
+            service_id = str(properties.get("privateLinkServiceId", "")).lower()
+            state = properties.get("privateLinkServiceConnectionState") or {}
+            if target_fragment in service_id and str(state.get("status", "")).lower() == "approved":
+                return True
+    return False
 
 
 def collect_key_vault_config(resource_group: str, key_vault_name: str):
@@ -159,3 +193,28 @@ def collect_sql_config(resource_group: str, sql_server_name: str):
         ),
         "azure_ad_admin_configured": bool(ad_admins),
     }
+
+
+def _load_security_signals() -> dict:
+    if not os.path.exists(SECURITY_SIGNALS_FILE):
+        return {}
+    with open(SECURITY_SIGNALS_FILE, "r", encoding="utf-8-sig") as file:
+        return json.load(file)
+
+
+def collect_storage_security_signals(resource_group: str, storage_account_name: str) -> list[dict]:
+    """Read optional Storage incident signals from Compliance/data/security_signals.json."""
+    signals = _load_security_signals()
+    return signals.get("storage", {}).get(storage_account_name, [])
+
+
+def collect_key_vault_security_signals(resource_group: str, key_vault_name: str) -> list[dict]:
+    """Read optional Key Vault incident signals from Compliance/data/security_signals.json."""
+    signals = _load_security_signals()
+    return signals.get("key_vault", {}).get(key_vault_name, [])
+
+
+def collect_sql_security_signals(resource_group: str, sql_server_name: str) -> list[dict]:
+    """Read optional SQL incident signals from Compliance/data/security_signals.json."""
+    signals = _load_security_signals()
+    return signals.get("sql", {}).get(sql_server_name, [])

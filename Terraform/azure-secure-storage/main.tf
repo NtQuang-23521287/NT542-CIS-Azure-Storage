@@ -10,5 +10,5 @@ resource "azurerm_resource_group" "rg" {
 
 # Data resource để tham chiếu đến Resource Group đã tạo
 data "azurerm_resource_group" "rg" {
-  name = azurerm_resource_group.rg.name  # Tham chiếu đến Resource Group đã tạo
+  name = azurerm_resource_group.rg.name # Tham chiếu đến Resource Group đã tạo
 }

@@ -32,6 +32,21 @@ output "subnet_private_endpoint_id" {
   value       = azurerm_subnet.private_endpoint.id
 }
 
+output "vpn_gateway_name" {
+  description = "Name of the Point-to-Site VPN Gateway"
+  value       = azurerm_virtual_network_gateway.vpn_gateway.name
+}
+
+output "vpn_gateway_public_ip" {
+  description = "Public IP address used by the Point-to-Site VPN Gateway"
+  value       = azurerm_public_ip.vpn_gateway_pip.ip_address
+}
+
+output "vpn_client_address_space" {
+  description = "Address pool assigned to Point-to-Site VPN clients"
+  value       = azurerm_virtual_network_gateway.vpn_gateway.vpn_client_configuration[0].address_space
+}
+
 output "storage_account_id" {
   description = "Resource ID of the Storage Account"
   value       = azurerm_storage_account.sa.id
@@ -96,6 +111,27 @@ output "sql_database_name" {
 output "sql_private_endpoint_ip" {
   description = "Private IP assigned to the SQL Private Endpoint NIC"
   value       = azurerm_private_endpoint.sql_pe.private_service_connection[0].private_ip_address
+}
+
+output "jumpbox_vm_name" {
+  description = "Name of the private management VM"
+  value       = azurerm_linux_virtual_machine.jumpbox.name
+}
+
+output "jumpbox_private_ip" {
+  description = "Private IP of the management VM. Connect after Point-to-Site VPN is up."
+  value       = azurerm_network_interface.jumpbox_nic.private_ip_address
+}
+
+output "jumpbox_admin_username" {
+  description = "Administrator username for the private management VM"
+  value       = azurerm_linux_virtual_machine.jumpbox.admin_username
+}
+
+output "jumpbox_admin_password" {
+  description = "Generated administrator password for the private management VM"
+  value       = random_password.jumpbox_admin.result
+  sensitive   = true
 }
 
 output "sql_admin_password" {

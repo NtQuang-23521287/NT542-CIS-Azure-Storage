@@ -5,6 +5,7 @@
 crash.log
 *.tfvars
 *.tfplan
+*.env
 /Compliance/engine/.env
 /Compliance/engine/logs/
 /Compliance/data/

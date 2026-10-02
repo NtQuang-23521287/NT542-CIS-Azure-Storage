@@ -1,17 +1,22 @@
 """
-remediation.py – Xử lý sửa lỗi cấu hình.
+Handle compliance issues by severity.
 
-Luồng xử lý theo mức độ:
-  CRITICAL → tự động sửa ngay, in thông báo ra terminal
-  WARNING  → hỏi admin có muốn sửa không, chờ xác nhận
+WARNING:
+  Log/report for admin review.
+CRITICAL:
+  Auto-remediate unless an active time-bound exception exists.
+ESCALATED_CRITICAL:
+  Trigger incident response. Exceptions cannot suppress incidents.
 """
 
-import os
-import subprocess
 import logging
+import subprocess
+
+from audit_logger import log_compliance_event, log_exception_event
+from exception_manager import find_active_exception, remaining_minutes
+from incident_response import handle_incident
 
 
-# ── Lệnh sửa lỗi tương ứng với từng vấn đề ───────────────────────────────────
 REMEDIATION_COMMANDS = {
     "HTTPS traffic only setting mismatch": (
         "az storage account update "
@@ -80,105 +85,146 @@ REMEDIATION_COMMANDS = {
     ),
 }
 
-# ── Màu ANSI để in terminal dễ đọc ───────────────────────────────────────────
-RED    = "\033[91m"
+
+RED = "\033[91m"
 YELLOW = "\033[93m"
-GREEN  = "\033[92m"
-CYAN   = "\033[96m"
-BOLD   = "\033[1m"
-RESET  = "\033[0m"
+GREEN = "\033[92m"
+BOLD = "\033[1m"
+RESET = "\033[0m"
 
 
-def _run_command(cmd: str, issue_name: str) -> bool:
-    """Chạy lệnh Azure CLI và trả về True nếu thành công."""
-    logging.info(f"[REMEDIATION] Đang chạy: {cmd}")
+def _run_command(cmd: str, issue_name: str, resource_name: str) -> bool:
+    logging.info("[REMEDIATION] Running: %s", cmd)
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
 
     if result.returncode == 0:
-        msg = f"[REMEDIATION] ✅ Sửa thành công: {issue_name}"
+        msg = f"[REMEDIATION] Success: {issue_name}"
         print(f"{GREEN}{msg}{RESET}")
         logging.info(msg)
+        log_compliance_event(
+            "AUTO_REMEDIATION_SUCCESS",
+            {
+                "Resource": resource_name,
+                "Issue": issue_name,
+                "Command": cmd,
+                "Result": "SUCCESS",
+            },
+        )
         return True
-    else:
-        msg = f"[REMEDIATION] ❌ Sửa THẤT BẠI: {issue_name}\n  Lỗi: {result.stderr.strip()}"
-        print(f"{RED}{msg}{RESET}")
-        logging.error(msg)
-        return False
+
+    error = result.stderr.strip() or result.stdout.strip()
+    msg = f"[REMEDIATION] Failed: {issue_name}. Error: {error}"
+    print(f"{RED}{msg}{RESET}")
+    logging.error(msg)
+    log_compliance_event(
+        "AUTO_REMEDIATION_FAILED",
+        {
+            "Resource": resource_name,
+            "Issue": issue_name,
+            "Command": cmd,
+            "Result": "FAILED",
+            "Error": error,
+        },
+    )
+    return False
+
+
+def _handle_warning(resource_name: str, issue: dict) -> None:
+    name = issue["name"]
+    print(
+        f"\n{YELLOW}{BOLD}[WARNING] Configuration drift detected{RESET}\n"
+        f"  Resource : {resource_name}\n"
+        f"  Issue    : {name}\n"
+        "  Action   : logged for report/admin review\n"
+    )
+    logging.warning("[WARNING] %s on %s", name, resource_name)
+    log_compliance_event(
+        "WARNING_DETECTED",
+        {
+            "Resource": resource_name,
+            "Issue": name,
+            "Action": "ADMIN_REVIEW_REQUIRED",
+        },
+    )
+
+
+def _handle_critical(resource_group: str, resource_name: str, issue: dict) -> None:
+    name = issue["name"]
+    active_exception = find_active_exception(resource_name, name)
+    if active_exception:
+        remaining = remaining_minutes(active_exception)
+        print(
+            f"\n{YELLOW}{BOLD}[CRITICAL] Drift allowed by active exception{RESET}\n"
+            f"  Resource : {resource_name}\n"
+            f"  Issue    : {name}\n"
+            f"  Exception: {active_exception['id']}\n"
+            f"  Remaining: {remaining} minutes\n"
+        )
+        logging.warning(
+            "[EXCEPTION] Skipped remediation for %s on %s via %s",
+            name,
+            resource_name,
+            active_exception["id"],
+        )
+        log_exception_event(
+            "REMEDIATION_SKIPPED",
+            {
+                "Resource": resource_name,
+                "Issue": name,
+                "Exception": active_exception["id"],
+                "Remaining": f"{remaining} minutes",
+                "Reason": active_exception.get("reason", ""),
+            },
+        )
+        return
+
+    cmd_template = REMEDIATION_COMMANDS.get(name)
+    if not cmd_template:
+        msg = f"No automatic remediation command for: {name}"
+        print(f"{YELLOW}{msg}{RESET}")
+        logging.warning("[REMEDIATION] %s", msg)
+        log_compliance_event(
+            "AUTO_REMEDIATION_UNAVAILABLE",
+            {
+                "Resource": resource_name,
+                "Issue": name,
+                "Action": "MANUAL_REVIEW_REQUIRED",
+            },
+        )
+        return
+
+    cmd = cmd_template.format(account=resource_name, rg=resource_group)
+    print(
+        f"\n{RED}{BOLD}[CRITICAL] Dangerous drift detected{RESET}\n"
+        f"  Resource : {resource_name} ({resource_group})\n"
+        f"  Issue    : {name}\n"
+        "  Action   : auto-remediating back to baseline\n"
+    )
+    logging.warning("[CRITICAL] Auto-remediating %s on %s", name, resource_name)
+    log_compliance_event(
+        "CRITICAL_DETECTED",
+        {
+            "Resource": resource_name,
+            "Issue": name,
+            "Action": "AUTO_REMEDIATE",
+            "Command": cmd,
+        },
+    )
+    _run_command(cmd, name, resource_name)
 
 
 def remediate_config(
     resource_group: str,
-    storage_account_name: str,
+    resource_name: str,
     issues: list[dict],
 ):
-    """
-    Xử lý từng vấn đề theo mức độ nghiêm trọng.
-
-    Parameters
-    ----------
-    resource_group         : tên Resource Group trên Azure
-    storage_account_name   : tên Storage Account
-    issues                 : danh sách dict {"name": str, "severity": str}
-    """
-
     for issue in issues:
-        name     = issue["name"]
         severity = issue["severity"]
-
-        cmd_template = REMEDIATION_COMMANDS.get(name)
-        if not cmd_template:
-            msg = (
-                f"[REMEDIATION] Khong co lenh tu dong cho: {name}. "
-                "Can xu ly thu cong hoac bo sung tham so identity/network."
-            )
-            print(f"{YELLOW}  -> {msg}{RESET}")
-            logging.warning(msg)
-            continue
-
-        cmd = cmd_template.format(account=storage_account_name, rg=resource_group)
-
-        # ── CRITICAL: tự động sửa ngay ───────────────────────────────────────
-        if severity == "CRITICAL":
-            header = (
-                f"\n{RED}{BOLD}[⚠ CRITICAL] Phát hiện thay đổi NGUY HIỂM!{RESET}\n"
-                f"  Vấn đề   : {name}\n"
-                f"  Tài nguyên: {storage_account_name} ({resource_group})\n"
-                f"  → Đang tự động sửa ngay để đảm bảo an toàn bảo mật...\n"
-            )
-            print(header)
-            logging.warning(
-                f"[CRITICAL] '{name}' trên {storage_account_name} – "
-                f"tự động remediate."
-            )
-            _run_command(cmd, name)
-
-        # ── WARNING: hỏi admin ────────────────────────────────────────────────
-        elif severity == "WARNING":
-            header = (
-                f"\n{YELLOW}{BOLD}[⚠ WARNING] Phát hiện thay đổi cấu hình!{RESET}\n"
-                f"  Vấn đề   : {name}\n"
-                f"  Tài nguyên: {storage_account_name} ({resource_group})\n"
-            )
-            print(header)
-            logging.warning(
-                f"[WARNING] '{name}' trên {storage_account_name} – "
-                f"chờ xác nhận admin."
-            )
-
-            try:
-                answer = input(
-                    f"{CYAN}  Admin có muốn khôi phục cấu hình đúng không? "
-                    f"[yes/no]: {RESET}"
-                ).strip().lower()
-            except EOFError:
-                answer = "no"
-
-            if answer in ("yes", "y"):
-                logging.info(
-                    f"[REMEDIATION] Admin đồng ý sửa: {name}"
-                )
-                _run_command(cmd, name)
-            else:
-                msg = f"[REMEDIATION] Admin từ chối sửa: {name}"
-                print(f"{YELLOW}  → Bỏ qua sửa lỗi theo yêu cầu admin.{RESET}\n")
-                logging.info(msg)
+        if severity == "WARNING":
+            _handle_warning(resource_name, issue)
+        elif severity == "CRITICAL":
+            _handle_critical(resource_group, resource_name, issue)
+        elif severity == "ESCALATED_CRITICAL":
+            handle_incident(resource_group, resource_name, issue)
+        else:
+            logging.warning("Unknown severity %s for issue %s", severity, issue)

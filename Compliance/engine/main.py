@@ -10,25 +10,36 @@ import logging
 import os
 import time
 
+from admin_listener import start_admin_listener
 from collector import (
+    collect_key_vault_security_signals,
     collect_key_vault_config,
+    collect_sql_security_signals,
     collect_sql_config,
+    collect_storage_security_signals,
     collect_storage_account_config,
     initialize_azure_clients,
 )
 from config import (
     CHECK_INTERVAL,
+    COMPLIANCE_LOG_FILE,
     KEY_VAULT_NAME,
+    LOG_DIR,
     RESOURCE_GROUP,
     SQL_SERVER_NAME,
     STORAGE_ACCOUNT_NAME,
 )
 from evaluator import evaluate_config, evaluate_key_vault_config, evaluate_sql_config
+from incident_evaluator import (
+    evaluate_key_vault_incidents,
+    evaluate_sql_incidents,
+    evaluate_storage_incidents,
+)
 from remediation import remediate_config
 
-os.makedirs("logs", exist_ok=True)
+os.makedirs(LOG_DIR, exist_ok=True)
 logging.basicConfig(
-    filename="logs/compliance_monitor.log",
+    filename=COMPLIANCE_LOG_FILE,
     level=logging.INFO,
     format="%(asctime)s  %(levelname)-8s  %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
@@ -67,6 +78,7 @@ EXPECTED_SQL_CONFIG = {
 
 def monitor():
     _, storage_client = initialize_azure_clients()
+    start_admin_listener()
 
     print(f"{BOLD}=== Azure Compliance Monitor ==={RESET}")
     print(f"  Resource Group  : {RESOURCE_GROUP}")
@@ -85,37 +97,47 @@ def monitor():
                     storage_client, RESOURCE_GROUP, STORAGE_ACCOUNT_NAME
                 ),
                 lambda config: evaluate_config(config, EXPECTED_STORAGE_CONFIG),
+                lambda: collect_storage_security_signals(
+                    RESOURCE_GROUP, STORAGE_ACCOUNT_NAME
+                ),
+                evaluate_storage_incidents,
             ),
             (
                 "Key Vault",
                 KEY_VAULT_NAME,
                 lambda: collect_key_vault_config(RESOURCE_GROUP, KEY_VAULT_NAME),
                 lambda config: evaluate_key_vault_config(config, EXPECTED_KEY_VAULT_CONFIG),
+                lambda: collect_key_vault_security_signals(RESOURCE_GROUP, KEY_VAULT_NAME),
+                evaluate_key_vault_incidents,
             ),
             (
                 "SQL Server",
                 SQL_SERVER_NAME,
                 lambda: collect_sql_config(RESOURCE_GROUP, SQL_SERVER_NAME),
                 lambda config: evaluate_sql_config(config, EXPECTED_SQL_CONFIG),
+                lambda: collect_sql_security_signals(RESOURCE_GROUP, SQL_SERVER_NAME),
+                evaluate_sql_incidents,
             ),
         ]
 
-        for service_name, resource_name, collect, evaluate in checks:
+        for service_name, resource_name, collect, evaluate, collect_signals, evaluate_incidents in checks:
             logging.info("Checking %s %s", service_name, resource_name)
 
             try:
                 current_config = collect()
                 drift_detected, issues = evaluate(current_config)
+                incident_detected, incident_issues = evaluate_incidents(collect_signals())
+                all_issues = issues + incident_issues
 
-                if drift_detected:
-                    issue_names = [issue["name"] for issue in issues]
+                if drift_detected or incident_detected:
+                    issue_names = [issue["name"] for issue in all_issues]
                     logging.warning(
-                        "Drift detected on %s %s: %s",
+                        "Issues detected on %s %s: %s",
                         service_name,
                         resource_name,
                         ", ".join(issue_names),
                     )
-                    remediate_config(RESOURCE_GROUP, resource_name, issues)
+                    remediate_config(RESOURCE_GROUP, resource_name, all_issues)
                 else:
                     msg = f"{service_name} {resource_name} is compliant."
                     print(f"{GREEN}{msg}{RESET}")
