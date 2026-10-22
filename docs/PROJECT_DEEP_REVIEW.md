@@ -1,5 +1,7 @@
 # PROJECT DEEP REVIEW - Azure Continuous Compliance & Auto-Remediation
 
+> Tài liệu này là snapshot review trước P0. Trạng thái vận hành hiện tại nằm trong `README.md` và `docs/baseline.md`; Azure remediation hiện plan-only mặc định.
+
 ## 1. Executive Summary
 
 Project NT542 xây dựng một mô hình Continuous Compliance và Auto-Remediation cho hệ thống lưu trữ dữ liệu nhạy cảm trên Microsoft Azure theo định hướng CIS Microsoft Azure Foundations Benchmark. Lõi kỹ thuật của project không chỉ là "dùng Azure", mà là biến secure baseline thành hạ tầng có thể tái tạo bằng Terraform, sau đó dùng Python Compliance Engine để kiểm tra trạng thái thực tế, phát hiện drift, phân loại severity, xử lý remediation, ghi log và tạo bằng chứng audit.
@@ -266,7 +268,7 @@ Hạn chế:
 - Lab scale, chưa multi-subscription/multi-resource-group.
 - Policy-as-Code chưa có source trong repo.
 - Rule engine hard-code, khó mở rộng rule CIS.
-- Remediation dùng `subprocess.run(..., shell=True)` và lệnh string, cần kiểm soát an toàn hơn.
+- Remediation từng dùng `subprocess.run(..., shell=True)` và lệnh string. P0 đã chuyển sang argument vector, timeout và plan-only mặc định; approval/verification đầy đủ vẫn còn trong roadmap.
 - Chưa có dry-run, rollback, impact analysis.
 - Exception thiếu `approved_by`, owner, ticket, risk acceptance, affected scope.
 - Chưa có dashboard trực quan.

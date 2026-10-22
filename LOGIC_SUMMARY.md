@@ -1,5 +1,7 @@
 # NT542 Azure Secure Storage - Logic Summary
 
+> Historical design snapshot. For current P0 behavior and safety constraints, use `README.md` and `docs/baseline.md`; Azure remediation is now plan-only by default.
+
 ## 1. Muc tieu he thong
 
 Project nay xay dung mot moi truong Azure private-first va mot compliance engine de giam sat drift sau khi ha tang duoc tao.
