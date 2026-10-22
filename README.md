@@ -52,8 +52,14 @@ Entrypoint hiện tại là `Compliance/engine/main.py`. Terraform root là `Ter
 
 Các lệnh này không tạo tài nguyên Azure:
 
+Chạy tại repository root với Python 3.14 (`python --version`). `.venv` phải là môi trường mới; không dùng lại `.venv` Python 3.13 cũ.
+
 ```powershell
-.venv\Scripts\python.exe -m unittest discover -s tests -v
+if (Test-Path .venv) { throw 'Move or remove the existing .venv before this clean-environment check.' }
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install --require-hashes -r requirements-dev.lock
+.venv\Scripts\python.exe -m pip check
+.venv\Scripts\python.exe -m pytest -q
 
 Set-Location Terraform\azure-secure-storage
 terraform fmt -check -recursive
@@ -62,6 +68,15 @@ terraform validate -no-color
 ```
 
 `terraform init` cần truy cập Terraform Registry nếu provider chưa có trong cache. File `.terraform.lock.hcl` phải được commit cùng P0 để pin provider đã resolve.
+
+`pyproject.toml` là nguồn khai báo dependency trực tiếp. `requirements.lock` khóa runtime; `requirements-dev.lock` khóa runtime cùng công cụ test/lint cho Python 3.14. Cả hai pin version và SHA-256; `Compliance/engine/requirements.txt` chỉ giữ vai trò tương thích với lệnh cài cũ và trỏ về runtime lock. Khi chủ động nâng dependency, tạo lại hai lock bằng `uv` từ repository root rồi cài và chạy test trong một virtual environment mới:
+
+```powershell
+.venv\Scripts\uv.exe pip compile pyproject.toml --generate-hashes --python-version 3.14 --output-file requirements.lock
+.venv\Scripts\uv.exe pip compile pyproject.toml --extra dev --generate-hashes --python-version 3.14 --output-file requirements-dev.lock
+```
+
+Pytest mặc định bỏ qua test gắn marker `live`; dùng `python -m pytest -m "not live"` để kiểm tra tường minh. Các test Phase C dùng fixture/mock và không đăng nhập hay tạo tài nguyên Azure.
 
 ## Chạy monitor trong lab
 

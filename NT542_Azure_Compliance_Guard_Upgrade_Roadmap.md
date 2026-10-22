@@ -430,16 +430,16 @@ terraform init
 - Reproducible environment.
 
 ### Làm
-- [ ] Tạo `pyproject.toml`.
-- [ ] Khai báo project metadata.
-- [ ] Khai báo runtime dependencies.
-- [ ] Khai báo dev dependencies: pytest, pytest-cov, Ruff, pip-tools hoặc cơ chế lock tương đương.
-- [ ] Sinh exact tested lock, không copy version ngẫu nhiên từ report.
+- [x] Tạo `pyproject.toml`.
+- [x] Khai báo project metadata.
+- [x] Khai báo runtime dependencies.
+- [x] Khai báo dev dependencies: pytest, pytest-cov, Ruff, pip-tools hoặc cơ chế lock tương đương.
+- [x] Sinh exact tested lock, không copy version ngẫu nhiên từ report.
 
 ### Verify
-- [ ] Tạo virtual environment mới.
-- [ ] Install từ locked dependencies.
-- [ ] Existing app vẫn import/run được.
+- [x] Tạo virtual environment mới.
+- [x] Install từ locked dependencies.
+- [x] Existing app vẫn import/run được.
 
 ---
 
@@ -461,12 +461,12 @@ tests/
 └── live/
 ```
 
-- [ ] Định nghĩa marker `integration`.
-- [ ] Định nghĩa marker `live`.
-- [ ] Normal CI phải chạy `not live`.
+- [x] Định nghĩa marker `integration`.
+- [x] Định nghĩa marker `live`.
+- [x] Pytest mặc định chạy `not live`; workflow CI thực tế thuộc Phase D.
 
 ### Done khi
-- [ ] `pytest -m "not live"` chạy được dù chưa có Azure login.
+- [x] `pytest -m "not live"` chạy được dù chưa có Azure login.
 
 ---
 
@@ -477,33 +477,33 @@ tests/
 - Boundary cases.
 
 ### Test tối thiểu
-- [ ] expected == actual → PASS.
-- [ ] expected != actual → FAIL.
-- [ ] severity được giữ đúng.
-- [ ] malformed input fail rõ ràng.
-- [ ] unknown property không bị silently PASS.
+- [x] expected == actual → PASS.
+- [x] expected != actual → FAIL.
+- [x] severity được giữ đúng.
+- [x] malformed input fail rõ ràng.
+- [x] unknown property không bị silently PASS.
 
 ### Done khi
-- [ ] Core decision logic có test deterministic.
+- [x] Core decision logic có test deterministic.
 
 ---
 
 ## C4. Test collectors bằng mock/fixture [DR]
 
 ### Storage
-- [ ] SDK response → normalized config.
-- [ ] Missing/None fields.
-- [ ] Azure exception.
+- [x] SDK response → normalized config.
+- [x] Missing/None fields.
+- [x] Azure exception.
 
 ### Key Vault / SQL CLI adapters
-- [ ] Argument vector đúng.
-- [ ] JSON parse đúng.
-- [ ] Non-zero exit.
-- [ ] Invalid JSON.
-- [ ] Timeout.
+- [x] Argument vector đúng.
+- [x] JSON parse đúng.
+- [x] Non-zero exit.
+- [x] Invalid JSON.
+- [x] Timeout.
 
 ### Done khi
-- [ ] Collector test không gọi Azure thật.
+- [x] Collector test không gọi Azure thật.
 
 ---
 
@@ -512,13 +512,13 @@ tests/
 ### Mục tiêu
 Tạo regression net trước khi thay đổi implementation.
 
-- [ ] Exception active/expired behavior.
-- [ ] Incident escalation behavior.
-- [ ] Remediation success/failure behavior hiện tại.
-- [ ] Log/evidence behavior hiện tại nếu có.
+- [x] Exception active/expired behavior.
+- [x] Incident escalation behavior.
+- [x] Remediation success/failure behavior hiện tại.
+- [x] Log/evidence behavior hiện tại nếu có.
 
 ### Done khi
-- [ ] Bạn có test mô tả current behavior, kể cả behavior chuẩn bị thay thế.
+- [x] Bạn có test mô tả current behavior, kể cả behavior chuẩn bị thay thế.
 
 ---
 
@@ -2278,7 +2278,8 @@ NT542-CIS-Azure-Storage/
 │   └── dependabot.yml
 │
 ├── pyproject.toml
-├── requirements.lock.txt
+├── requirements.lock
+├── requirements-dev.lock
 ├── CHANGELOG.md
 ├── CONTRIBUTING.md
 ├── SECURITY.md
