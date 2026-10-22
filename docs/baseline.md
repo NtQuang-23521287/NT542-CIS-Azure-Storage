@@ -57,6 +57,7 @@ Phase A5 selected CIS Azure Storage Services 2.0.0 and Prowler 5.45.0 as version
 - `terraform fmt -check -recursive`: PASS.
 - `terraform init -backend=false -input=false -lockfile=readonly` using the existing offline provider cache: PASS (AzureRM 3.117.1, random 3.9.0).
 - `terraform validate -no-color`: PASS.
+- Fresh local clone after the A/B commits: `terraform init -backend=false -input=false -lockfile=readonly` and `terraform validate -no-color` PASS using the existing offline provider directory. This verifies locked provider versions in a clean checkout, not a fresh registry download or provider-signature check.
 - `.venv/Scripts/python.exe -m unittest discover -s tests -v`: 7/7 PASS; no Azure calls.
 - `.gitignore` excludes bytecode/runtime state and does **not** exclude `.terraform.lock.hcl`; nine formerly tracked `.pyc` files were removed from Git's index.
 - Paid Defender-for-SQL remediation is `MANUAL_ONLY`; all Azure CLI reads and mutations use argument vectors and the configured subscription, not `shell=True` or the session's default subscription; the monitor defaults to plan-only.

@@ -33,14 +33,16 @@ class AzureCliTests(TestCase):
         )
 
     def test_run_az_refuses_missing_or_invalid_subscription(self):
-        with (
-            patch.object(azure_cli, "AZURE_SUBSCRIPTION_ID", None),
-            patch.object(azure_cli.subprocess, "run") as subprocess_run,
-        ):
-            with self.assertRaises(ValueError):
-                azure_cli.run_az(["storage", "account", "show"])
+        for invalid_id in (None, "not-a-guid"):
+            with self.subTest(invalid_id=invalid_id):
+                with (
+                    patch.object(azure_cli, "AZURE_SUBSCRIPTION_ID", invalid_id),
+                    patch.object(azure_cli.subprocess, "run") as subprocess_run,
+                ):
+                    with self.assertRaises(ValueError):
+                        azure_cli.run_az(["storage", "account", "show"])
 
-        subprocess_run.assert_not_called()
+                subprocess_run.assert_not_called()
 
     def test_run_az_refuses_subscription_override(self):
         with (
