@@ -13,13 +13,13 @@ resource "azurerm_storage_account" "sa" {
   infrastructure_encryption_enabled = true
 
   # ── Security requirements ──────────────────────────────────────────────────
-  # CIS Azure 3.1  – require HTTPS
+  # Require secure transfer; benchmark control mapping is not yet verified.
   https_traffic_only_enabled = true
 
-  # CIS Azure 3.2  – minimum TLS version
+  # Require TLS 1.2 as the configured minimum.
   min_tls_version = "TLS1_2"
 
-  # CIS Azure 3.5  – disable public blob access
+  # Disallow anonymous public access to blobs/containers.
   allow_nested_items_to_be_public = false
 
   # Disable public network access entirely; traffic flows via Private Endpoint

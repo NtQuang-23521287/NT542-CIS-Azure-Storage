@@ -74,6 +74,12 @@ variable "vpn_gateway_public_ip_name" {
   default     = "nt542_auto-vpngw-pip"
 }
 
+variable "vpn_gateway_public_ip_zones" {
+  description = "Optional availability zones for the VPN Gateway public IP"
+  type        = list(string)
+  default     = []
+}
+
 variable "vpn_client_address_space" {
   description = "Address pool assigned to VPN Point-to-Site clients"
   type        = list(string)
