@@ -1,17 +1,36 @@
+# Local planning artifacts
+tasks/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime data and evidence
+*.log
+*.db
+*.db-wal
+*.db-shm
+/Compliance/engine/logs/
+/Compliance/data/exceptions.json
+/Compliance/data/security_signals.json
+/reports/private/
+
+# Terraform local state and plans. Keep .terraform.lock.hcl tracked.
 .terraform/
 *.tfstate
 *.tfstate.*
-.terraform.lock.hcl
-crash.log
 *.tfvars
 *.tfplan
-*.env
-/Compliance/engine/.env
-/Compliance/engine/logs/
-/Compliance/data/
-/Terraform/azure-secure-storage/.terraform/
-/Terraform/azure-secure-storage/terraform.tfstate
-/Terraform/azure-secure-storage/terraform.tfstate.backup
-/Terraform/azure-secure-storage/.terraform.lock.hcl
-/Terraform/azure-secure-storage/.terraform/
-/Terraform/azure-secure-storage/azure/
+crash.log
