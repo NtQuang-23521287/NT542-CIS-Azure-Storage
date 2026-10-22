@@ -59,11 +59,13 @@ if (Test-Path .venv) { throw 'Move or remove the existing .venv before this clea
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install --require-hashes -r requirements-dev.lock
 .venv\Scripts\python.exe -m pip check
-.venv\Scripts\python.exe -m pytest -q
+.venv\Scripts\ruff.exe check .
+.venv\Scripts\ruff.exe format --check .
+.venv\Scripts\python.exe -m pytest -m "not live" -q --cov=evaluator --cov=remediation --cov=incident_response --cov=azure_cli --cov-report=term-missing --cov-report=xml:coverage.xml --cov-fail-under=80
 
 Set-Location Terraform\azure-secure-storage
 terraform fmt -check -recursive
-terraform init -backend=false -input=false
+terraform init -backend=false -input=false -lockfile=readonly
 terraform validate -no-color
 ```
 
@@ -77,6 +79,14 @@ terraform validate -no-color
 ```
 
 Pytest mặc định bỏ qua test gắn marker `live`; dùng `python -m pytest -m "not live"` để kiểm tra tường minh. Các test Phase C dùng fixture/mock và không đăng nhập hay tạo tài nguyên Azure.
+
+## Offline CI (Phase D)
+
+`.github/workflows/ci.yml` chạy trên mọi pull request và mỗi push vào `main`: Ruff lint/format, pytest offline với ngưỡng coverage 80% cho bốn module quyết định, Terraform fmt/init/validate và Trivy config scan (chặn finding `HIGH`/`CRITICAL`). Workflow không khai báo Azure credential, không gọi `az login`, `terraform plan`, `apply` hoặc `destroy`. `terraform validate` kiểm tra cấu hình nội bộ, không chứng minh tài nguyên live hoặc mức độ tuân thủ CIS.
+
+Các action được pin theo commit SHA và token chỉ có `contents: read`. `.github/dependabot.yml` theo dõi Python và GitHub Actions; khi Dependabot cập nhật `pyproject.toml`, phải tạo lại cả hai file `requirements*.lock` bằng `uv`, kiểm tra diff rồi chạy CI trước khi merge. Không merge PR chỉ thay manifest mà lockfile chưa đồng bộ.
+
+Chỉ sau khi workflow chạy thành công trên GitHub mới có thể coi CI là xanh. Trong repository public, bật **Settings → Advanced Security → CodeQL analysis → Default setup**, **Secret scanning** và **Push protection** nếu các tùy chọn hiện ra; bật required status checks và review trên nhánh `main` trong **Settings → Rules**. Các thiết lập này cần chủ repo thực hiện trên GitHub; file workflow không tự bật chúng.
 
 ## Chạy monitor trong lab
 
@@ -117,7 +127,7 @@ Không commit `.env`, Terraform state, `*.tfvars`, log, database hoặc private 
 - Chưa có approval artifact, stale-plan protection, rollback hoặc verification loop.
 - Incident detection vẫn dựa trên fixture local, chưa phải Azure Monitor/KQL.
 - Exception state và evidence còn dùng file local; chưa có SQLite/HTML report.
-- Chưa có GitHub Actions, OIDC, CodeQL hoặc IaC security scan.
+- Offline CI và IaC scan đã được cấu hình ở Phase D nhưng chưa xác nhận run xanh trên GitHub; OIDC và CodeQL/default secret scanning vẫn cần triển khai hoặc bật trong GitHub Settings.
 - Terraform full profile gồm tài nguyên có chi phí như VPN Gateway, VM, SQL, Private Endpoint và Log Analytics.
 - Chưa có kết quả đối chiếu live với Azure Policy/Prowler; chưa claim coverage theo một CIS control cụ thể.
 
