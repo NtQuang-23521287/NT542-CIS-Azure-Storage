@@ -4,7 +4,8 @@ from pathlib import Path
 try:
     from dotenv import load_dotenv
 
-    load_dotenv(override=True)
+    # Explicit process environment wins over local .env configuration.
+    load_dotenv(override=False)
 except ImportError:
     pass
 
@@ -16,6 +17,22 @@ AZURE_SUBSCRIPTION_ID = os.getenv('AZURE_SUBSCRIPTION_ID')
 
 # Time settings for monitoring interval (in seconds)
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "5"))
+
+
+def _boolean_env(name: str, default: bool = False) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    value = raw_value.strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean value")
+
+
+# Temporary P0 safety gate. The long-term workflow is plan -> approval -> execute -> verify.
+ALLOW_AZURE_MUTATIONS = _boolean_env("ALLOW_AZURE_MUTATIONS", default=False)
 
 # Monitored resources. Defaults match the Terraform module.
 RESOURCE_GROUP = os.getenv("RESOURCE_GROUP", "NT542-Group08_AUTO")

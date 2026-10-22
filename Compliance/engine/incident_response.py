@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import logging
-import subprocess
 
 from audit_logger import log_incident_event
+from azure_cli import display_az_command, run_az
 from exception_manager import (
     find_active_exception_for_resource,
     revoke_active_exceptions_for_resource,
@@ -16,41 +16,52 @@ RESET = "\033[0m"
 
 CONTAINMENT_COMMANDS = {
     "storage": (
-        "az storage account update "
-        "--name {resource} "
-        "--resource-group {rg} "
-        "--public-network-access Disabled"
+        "storage", "account", "update", "--name", "{resource}",
+        "--resource-group", "{rg}", "--public-network-access", "Disabled",
     ),
     "key_vault": (
-        "az keyvault update "
-        "--name {resource} "
-        "--resource-group {rg} "
-        "--public-network-access Disabled"
+        "keyvault", "update", "--name", "{resource}", "--resource-group", "{rg}",
+        "--public-network-access", "Disabled",
     ),
     "sql": (
-        "az sql server update "
-        "--name {resource} "
-        "--resource-group {rg} "
-        "--enable-public-network false"
+        "sql", "server", "update", "--name", "{resource}",
+        "--resource-group", "{rg}", "--enable-public-network", "false",
     ),
 }
 
 
-def _run_containment(resource_group: str, resource_name: str, issue: dict) -> tuple[str, str]:
+def _run_containment(
+    resource_group: str,
+    resource_name: str,
+    issue: dict,
+    allow_mutation: bool = False,
+) -> tuple[str, str]:
     service = issue.get("service")
     command_template = CONTAINMENT_COMMANDS.get(service)
     if not command_template:
         return "SKIPPED", f"No containment command for service: {service}"
 
-    command = command_template.format(resource=resource_name, rg=resource_group)
-    result = subprocess.run(command, shell=True, capture_output=True, text=True)
+    args = [
+        part.format(resource=resource_name, rg=resource_group)
+        for part in command_template
+    ]
+    command = display_az_command(args)
+    if not allow_mutation:
+        return "PLANNED", command
+
+    result = run_az(args)
     if result.returncode == 0:
         return "SUCCESS", command
     error = result.stderr.strip() or result.stdout.strip()
     return "FAILED", f"{command} | {error}"
 
 
-def handle_incident(resource_group: str, resource_name: str, issue: dict) -> None:
+def handle_incident(
+    resource_group: str,
+    resource_name: str,
+    issue: dict,
+    allow_mutation: bool = False,
+) -> None:
     evidence = issue.get("evidence", {})
     active_exception = find_active_exception_for_resource(resource_name)
     exception_note = (
@@ -62,7 +73,17 @@ def handle_incident(resource_group: str, resource_name: str, issue: dict) -> Non
         resource_name,
         f"Revoked because {issue['name']} was detected",
     )
-    containment_status, containment_detail = _run_containment(resource_group, resource_name, issue)
+    containment_status, containment_detail = _run_containment(
+        resource_group,
+        resource_name,
+        issue,
+        allow_mutation=allow_mutation,
+    )
+    containment_action = (
+        "containment plan generated; explicit operator opt-in is required"
+        if containment_status == "PLANNED"
+        else "urgent review required; validate the containment result"
+    )
 
     print(
         f"\n{RED}{BOLD}[ESCALATED_CRITICAL] Security incident detected{RESET}\n"
@@ -74,7 +95,7 @@ def handle_incident(resource_group: str, resource_name: str, issue: dict) -> Non
         f"  Result   : {evidence.get('result', 'unknown')}\n"
         f"  Exception: revoked {len(revoked)} active exception(s)\n"
         f"  Contain  : {containment_status}\n"
-        "  Action   : urgent review required; public exposure is contained when possible\n"
+        f"  Action   : {containment_action}\n"
     )
 
     log_incident_event(

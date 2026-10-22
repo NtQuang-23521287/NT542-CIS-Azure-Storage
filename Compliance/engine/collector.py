@@ -4,9 +4,8 @@ from azure.mgmt.storage import StorageManagementClient
 import logging
 import os
 import json
-import subprocess
-import shutil
 from dotenv import load_dotenv
+from azure_cli import display_az_command, run_az
 from config import SECURITY_SIGNALS_FILE
 load_dotenv()
 
@@ -60,13 +59,9 @@ def collect_storage_account_config(storage_client, resource_group, storage_accou
 
 def _run_az_json(args: list[str]):
     """Run an Azure CLI command and parse its JSON output."""
-    az_cli = shutil.which("az") or shutil.which("az.cmd") or shutil.which("az.exe")
-    if not az_cli:
-        raise RuntimeError("Azure CLI was not found in PATH. Install Azure CLI or restart the terminal.")
-
-    command = [az_cli, *args, "--output", "json"]
-    logging.info("[COLLECTOR] Running Azure CLI: %s", " ".join(command))
-    result = subprocess.run(command, capture_output=True, text=True)
+    command = [*args, "--output", "json"]
+    logging.info("[COLLECTOR] Running Azure CLI: %s", display_az_command(command))
+    result = run_az(command)
     if result.returncode != 0:
         raise RuntimeError(result.stderr.strip() or result.stdout.strip())
     if not result.stdout.strip():

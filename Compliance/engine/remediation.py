@@ -4,84 +4,66 @@ Handle compliance issues by severity.
 WARNING:
   Log/report for admin review.
 CRITICAL:
-  Auto-remediate unless an active time-bound exception exists.
+  Produce a plan by default. Execution requires explicit operator opt-in.
 ESCALATED_CRITICAL:
-  Trigger incident response. Exceptions cannot suppress incidents.
+  Trigger incident response. Azure containment is plan-only by default.
 """
 
 import logging
-import subprocess
 
 from audit_logger import log_compliance_event, log_exception_event
+from azure_cli import display_az_command, run_az
 from exception_manager import find_active_exception, remaining_minutes
 from incident_response import handle_incident
 
 
 REMEDIATION_COMMANDS = {
     "HTTPS traffic only setting mismatch": (
-        "az storage account update "
-        "--name {account} "
-        "--resource-group {rg} "
-        "--https-only true"
+        "storage", "account", "update", "--name", "{account}",
+        "--resource-group", "{rg}", "--https-only", "true",
     ),
     "Minimum TLS version mismatch": (
-        "az storage account update "
-        "--name {account} "
-        "--resource-group {rg} "
-        "--minimum-tls-version TLS1_2"
+        "storage", "account", "update", "--name", "{account}",
+        "--resource-group", "{rg}", "--minimum-tls-version", "TLS1_2",
     ),
     "Public Network Access mismatch": (
-        "az storage account update "
-        "--name {account} "
-        "--resource-group {rg} "
-        "--public-network-access Disabled"
+        "storage", "account", "update", "--name", "{account}",
+        "--resource-group", "{rg}", "--public-network-access", "Disabled",
     ),
     "Blob versioning disabled": (
-        "az storage account blob-service-properties update "
-        "--account-name {account} "
-        "--resource-group {rg} "
-        "--enable-versioning true"
+        "storage", "account", "blob-service-properties", "update",
+        "--account-name", "{account}", "--resource-group", "{rg}",
+        "--enable-versioning", "true",
     ),
     "Key Vault Public Network Access mismatch": (
-        "az keyvault update "
-        "--name {account} "
-        "--resource-group {rg} "
-        "--public-network-access Disabled"
+        "keyvault", "update", "--name", "{account}", "--resource-group", "{rg}",
+        "--public-network-access", "Disabled",
     ),
     "Key Vault RBAC authorization disabled": (
-        "az keyvault update "
-        "--name {account} "
-        "--resource-group {rg} "
-        "--enable-rbac-authorization true"
+        "keyvault", "update", "--name", "{account}", "--resource-group", "{rg}",
+        "--enable-rbac-authorization", "true",
     ),
     "Key Vault recoverability mismatch": (
-        "az keyvault update "
-        "--name {account} "
-        "--resource-group {rg} "
-        "--enable-purge-protection true"
+        "keyvault", "update", "--name", "{account}", "--resource-group", "{rg}",
+        "--enable-purge-protection", "true",
     ),
     "SQL auditing disabled": (
-        "az sql server audit-policy update "
-        "--resource-group {rg} "
-        "--name {account} "
-        "--state Enabled"
-    ),
-    "Microsoft Defender for SQL disabled": (
-        "az security pricing create "
-        "--name SqlServers "
-        "--tier Standard"
+        "sql", "server", "audit-policy", "update", "--resource-group", "{rg}",
+        "--name", "{account}", "--state", "Enabled",
     ),
     "SQL Minimum TLS version mismatch": (
-        "az sql server update "
-        "--name {account} "
-        "--resource-group {rg} "
-        "--minimal-tls-version 1.2"
+        "sql", "server", "update", "--name", "{account}",
+        "--resource-group", "{rg}", "--minimal-tls-version", "1.2",
     ),
     "SQL Public Network Access mismatch": (
-        "az sql server update "
-        "--name {account} "
-        "--resource-group {rg} "
-        "--enable-public-network false"
+        "sql", "server", "update", "--name", "{account}",
+        "--resource-group", "{rg}", "--enable-public-network", "false",
+    ),
+}
+
+MANUAL_ONLY_REMEDIATIONS = {
+    "Microsoft Defender for SQL disabled": (
+        "Enabling Defender changes subscription-level pricing and requires explicit cost approval."
     ),
 }
 
@@ -93,9 +75,14 @@ BOLD = "\033[1m"
 RESET = "\033[0m"
 
 
-def _run_command(cmd: str, issue_name: str, resource_name: str) -> bool:
-    logging.info("[REMEDIATION] Running: %s", cmd)
-    result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+def _render_args(template: tuple[str, ...], resource_group: str, resource_name: str) -> list[str]:
+    return [part.format(account=resource_name, rg=resource_group) for part in template]
+
+
+def _run_command(args: list[str], issue_name: str, resource_name: str) -> bool:
+    command = display_az_command(args)
+    logging.info("[REMEDIATION] Running: %s", command)
+    result = run_az(args)
 
     if result.returncode == 0:
         msg = f"[REMEDIATION] Success: {issue_name}"
@@ -106,7 +93,7 @@ def _run_command(cmd: str, issue_name: str, resource_name: str) -> bool:
             {
                 "Resource": resource_name,
                 "Issue": issue_name,
-                "Command": cmd,
+                "Command": command,
                 "Result": "SUCCESS",
             },
         )
@@ -121,7 +108,7 @@ def _run_command(cmd: str, issue_name: str, resource_name: str) -> bool:
         {
             "Resource": resource_name,
             "Issue": issue_name,
-            "Command": cmd,
+            "Command": command,
             "Result": "FAILED",
             "Error": error,
         },
@@ -148,7 +135,12 @@ def _handle_warning(resource_name: str, issue: dict) -> None:
     )
 
 
-def _handle_critical(resource_group: str, resource_name: str, issue: dict) -> None:
+def _handle_critical(
+    resource_group: str,
+    resource_name: str,
+    issue: dict,
+    allow_mutation: bool,
+) -> None:
     name = issue["name"]
     active_exception = find_active_exception(resource_name, name)
     if active_exception:
@@ -178,8 +170,23 @@ def _handle_critical(resource_group: str, resource_name: str, issue: dict) -> No
         )
         return
 
-    cmd_template = REMEDIATION_COMMANDS.get(name)
-    if not cmd_template:
+    manual_reason = MANUAL_ONLY_REMEDIATIONS.get(name)
+    if manual_reason:
+        print(f"{YELLOW}Manual remediation required: {name}. {manual_reason}{RESET}")
+        logging.warning("[REMEDIATION] Manual-only: %s. %s", name, manual_reason)
+        log_compliance_event(
+            "MANUAL_REMEDIATION_REQUIRED",
+            {
+                "Resource": resource_name,
+                "Issue": name,
+                "Action": "MANUAL_ONLY",
+                "Reason": manual_reason,
+            },
+        )
+        return
+
+    command_template = REMEDIATION_COMMANDS.get(name)
+    if not command_template:
         msg = f"No automatic remediation command for: {name}"
         print(f"{YELLOW}{msg}{RESET}")
         logging.warning("[REMEDIATION] %s", msg)
@@ -193,38 +200,65 @@ def _handle_critical(resource_group: str, resource_name: str, issue: dict) -> No
         )
         return
 
-    cmd = cmd_template.format(account=resource_name, rg=resource_group)
+    args = _render_args(command_template, resource_group, resource_name)
+    command = display_az_command(args)
+    if not allow_mutation:
+        print(
+            f"\n{YELLOW}{BOLD}[CRITICAL] Remediation plan created{RESET}\n"
+            f"  Resource : {resource_name} ({resource_group})\n"
+            f"  Issue    : {name}\n"
+            f"  Plan     : {command}\n"
+            "  Action   : not executed; explicit operator opt-in is required\n"
+        )
+        logging.warning("[CRITICAL] Plan-only remediation for %s on %s", name, resource_name)
+        log_compliance_event(
+            "REMEDIATION_PLAN_CREATED",
+            {
+                "Resource": resource_name,
+                "Issue": name,
+                "Action": "EXPLICIT_OPT_IN_REQUIRED",
+                "Command": command,
+            },
+        )
+        return
+
     print(
         f"\n{RED}{BOLD}[CRITICAL] Dangerous drift detected{RESET}\n"
         f"  Resource : {resource_name} ({resource_group})\n"
         f"  Issue    : {name}\n"
-        "  Action   : auto-remediating back to baseline\n"
+        "  Action   : executing because Azure mutation was explicitly enabled\n"
     )
-    logging.warning("[CRITICAL] Auto-remediating %s on %s", name, resource_name)
+    logging.warning("[CRITICAL] Executing opted-in remediation %s on %s", name, resource_name)
     log_compliance_event(
         "CRITICAL_DETECTED",
         {
             "Resource": resource_name,
             "Issue": name,
-            "Action": "AUTO_REMEDIATE",
-            "Command": cmd,
+            "Action": "EXECUTE_EXPLICIT_OPT_IN",
+            "Command": command,
         },
     )
-    _run_command(cmd, name, resource_name)
+    _run_command(args, name, resource_name)
 
 
 def remediate_config(
     resource_group: str,
     resource_name: str,
     issues: list[dict],
+    allow_mutation: bool = False,
 ):
     for issue in issues:
         severity = issue["severity"]
         if severity == "WARNING":
             _handle_warning(resource_name, issue)
         elif severity == "CRITICAL":
-            _handle_critical(resource_group, resource_name, issue)
+            _handle_critical(resource_group, resource_name, issue, allow_mutation)
         elif severity == "ESCALATED_CRITICAL":
-            handle_incident(resource_group, resource_name, issue)
+            handle_incident(
+                resource_group,
+                resource_name,
+                issue,
+                allow_mutation=allow_mutation,
+            )
         else:
             logging.warning("Unknown severity %s for issue %s", severity, issue)
