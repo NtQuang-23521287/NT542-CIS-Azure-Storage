@@ -34,6 +34,30 @@ SEVERITY = {
     "SQL suspicious successful login": ESCALATED_CRITICAL,
 }
 
+STORAGE_FIELDS = {"https_only", "min_tls_version", "public_network_access", "versioning_enabled"}
+KEY_VAULT_FIELDS = {
+    "public_network_access", "enable_rbac_authorization", "enable_soft_delete",
+    "enable_purge_protection", "private_endpoint_enabled", "keys_have_expiry",
+    "secrets_have_expiry",
+}
+SQL_FIELDS = {
+    "auditing_enabled", "defender_enabled", "min_tls_version",
+    "public_network_access", "private_endpoint_enabled", "azure_ad_admin_configured",
+}
+
+
+def _validate_config(actual: dict, expected: dict, fields: set[str]) -> None:
+    for label, config in (("actual", actual), ("expected", expected)):
+        if not isinstance(config, dict):
+            raise TypeError(f"{label} configuration keys must be a dictionary")
+        missing = fields - config.keys()
+        unknown = config.keys() - fields
+        if missing or unknown:
+            raise ValueError(
+                f"{label} configuration keys invalid: "
+                f"missing={sorted(missing)}, unknown={sorted(unknown)}"
+            )
+
 
 def _add_issue(issues: list[dict], name: str, service: str | None = None) -> None:
     issue = {
@@ -47,6 +71,7 @@ def _add_issue(issues: list[dict], name: str, service: str | None = None) -> Non
 
 def evaluate_config(actual_config: dict, expected_config: dict):
     """Evaluate Storage Account baseline drift."""
+    _validate_config(actual_config, expected_config, STORAGE_FIELDS)
     issues = []
 
     if actual_config["https_only"] != expected_config["https_only"]:
@@ -66,6 +91,7 @@ def evaluate_config(actual_config: dict, expected_config: dict):
 
 def evaluate_key_vault_config(actual_config: dict, expected_config: dict):
     """Evaluate Key Vault baseline drift."""
+    _validate_config(actual_config, expected_config, KEY_VAULT_FIELDS)
     issues = []
 
     if actual_config["public_network_access"] != expected_config["public_network_access"]:
@@ -94,6 +120,7 @@ def evaluate_key_vault_config(actual_config: dict, expected_config: dict):
 
 def evaluate_sql_config(actual_config: dict, expected_config: dict):
     """Evaluate Azure SQL baseline drift."""
+    _validate_config(actual_config, expected_config, SQL_FIELDS)
     issues = []
 
     if actual_config["auditing_enabled"] != expected_config["auditing_enabled"]:
