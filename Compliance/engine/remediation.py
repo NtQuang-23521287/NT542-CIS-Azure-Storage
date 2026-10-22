@@ -16,48 +16,115 @@ from azure_cli import display_az_command, run_az
 from exception_manager import find_active_exception, remaining_minutes
 from incident_response import handle_incident
 
-
 REMEDIATION_COMMANDS = {
     "HTTPS traffic only setting mismatch": (
-        "storage", "account", "update", "--name", "{account}",
-        "--resource-group", "{rg}", "--https-only", "true",
+        "storage",
+        "account",
+        "update",
+        "--name",
+        "{account}",
+        "--resource-group",
+        "{rg}",
+        "--https-only",
+        "true",
     ),
     "Minimum TLS version mismatch": (
-        "storage", "account", "update", "--name", "{account}",
-        "--resource-group", "{rg}", "--minimum-tls-version", "TLS1_2",
+        "storage",
+        "account",
+        "update",
+        "--name",
+        "{account}",
+        "--resource-group",
+        "{rg}",
+        "--minimum-tls-version",
+        "TLS1_2",
     ),
     "Public Network Access mismatch": (
-        "storage", "account", "update", "--name", "{account}",
-        "--resource-group", "{rg}", "--public-network-access", "Disabled",
+        "storage",
+        "account",
+        "update",
+        "--name",
+        "{account}",
+        "--resource-group",
+        "{rg}",
+        "--public-network-access",
+        "Disabled",
     ),
     "Blob versioning disabled": (
-        "storage", "account", "blob-service-properties", "update",
-        "--account-name", "{account}", "--resource-group", "{rg}",
-        "--enable-versioning", "true",
+        "storage",
+        "account",
+        "blob-service-properties",
+        "update",
+        "--account-name",
+        "{account}",
+        "--resource-group",
+        "{rg}",
+        "--enable-versioning",
+        "true",
     ),
     "Key Vault Public Network Access mismatch": (
-        "keyvault", "update", "--name", "{account}", "--resource-group", "{rg}",
-        "--public-network-access", "Disabled",
+        "keyvault",
+        "update",
+        "--name",
+        "{account}",
+        "--resource-group",
+        "{rg}",
+        "--public-network-access",
+        "Disabled",
     ),
     "Key Vault RBAC authorization disabled": (
-        "keyvault", "update", "--name", "{account}", "--resource-group", "{rg}",
-        "--enable-rbac-authorization", "true",
+        "keyvault",
+        "update",
+        "--name",
+        "{account}",
+        "--resource-group",
+        "{rg}",
+        "--enable-rbac-authorization",
+        "true",
     ),
     "Key Vault recoverability mismatch": (
-        "keyvault", "update", "--name", "{account}", "--resource-group", "{rg}",
-        "--enable-purge-protection", "true",
+        "keyvault",
+        "update",
+        "--name",
+        "{account}",
+        "--resource-group",
+        "{rg}",
+        "--enable-purge-protection",
+        "true",
     ),
     "SQL auditing disabled": (
-        "sql", "server", "audit-policy", "update", "--resource-group", "{rg}",
-        "--name", "{account}", "--state", "Enabled",
+        "sql",
+        "server",
+        "audit-policy",
+        "update",
+        "--resource-group",
+        "{rg}",
+        "--name",
+        "{account}",
+        "--state",
+        "Enabled",
     ),
     "SQL Minimum TLS version mismatch": (
-        "sql", "server", "update", "--name", "{account}",
-        "--resource-group", "{rg}", "--minimal-tls-version", "1.2",
+        "sql",
+        "server",
+        "update",
+        "--name",
+        "{account}",
+        "--resource-group",
+        "{rg}",
+        "--minimal-tls-version",
+        "1.2",
     ),
     "SQL Public Network Access mismatch": (
-        "sql", "server", "update", "--name", "{account}",
-        "--resource-group", "{rg}", "--enable-public-network", "false",
+        "sql",
+        "server",
+        "update",
+        "--name",
+        "{account}",
+        "--resource-group",
+        "{rg}",
+        "--enable-public-network",
+        "false",
     ),
 }
 
@@ -75,7 +142,9 @@ BOLD = "\033[1m"
 RESET = "\033[0m"
 
 
-def _render_args(template: tuple[str, ...], resource_group: str, resource_name: str) -> list[str]:
+def _render_args(
+    template: tuple[str, ...], resource_group: str, resource_name: str
+) -> list[str]:
     return [part.format(account=resource_name, rg=resource_group) for part in template]
 
 
@@ -210,7 +279,9 @@ def _handle_critical(
             f"  Plan     : {command}\n"
             "  Action   : not executed; explicit operator opt-in is required\n"
         )
-        logging.warning("[CRITICAL] Plan-only remediation for %s on %s", name, resource_name)
+        logging.warning(
+            "[CRITICAL] Plan-only remediation for %s on %s", name, resource_name
+        )
         log_compliance_event(
             "REMEDIATION_PLAN_CREATED",
             {
@@ -228,7 +299,9 @@ def _handle_critical(
         f"  Issue    : {name}\n"
         "  Action   : executing because Azure mutation was explicitly enabled\n"
     )
-    logging.warning("[CRITICAL] Executing opted-in remediation %s on %s", name, resource_name)
+    logging.warning(
+        "[CRITICAL] Executing opted-in remediation %s on %s", name, resource_name
+    )
     log_compliance_event(
         "CRITICAL_DETECTED",
         {

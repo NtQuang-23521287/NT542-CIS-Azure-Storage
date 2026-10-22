@@ -1,6 +1,7 @@
 import logging
 import os
 
+
 def setup_logger():
     os.makedirs("logs", exist_ok=True)
     logging.basicConfig(
@@ -9,6 +10,7 @@ def setup_logger():
         format="%(asctime)s  %(levelname)-8s  %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
     )
+
 
 def log_event(message: str):
     logging.info(message)

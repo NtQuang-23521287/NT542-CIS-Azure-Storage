@@ -10,10 +10,10 @@ except ImportError:
     pass
 
 # Azure Credentials
-AZURE_TENANT_ID = os.getenv('AZURE_TENANT_ID')
-AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID')
-AZURE_CLIENT_SECRET = os.getenv('AZURE_CLIENT_SECRET')
-AZURE_SUBSCRIPTION_ID = os.getenv('AZURE_SUBSCRIPTION_ID')
+AZURE_TENANT_ID = os.getenv("AZURE_TENANT_ID")
+AZURE_CLIENT_ID = os.getenv("AZURE_CLIENT_ID")
+AZURE_CLIENT_SECRET = os.getenv("AZURE_CLIENT_SECRET")
+AZURE_SUBSCRIPTION_ID = os.getenv("AZURE_SUBSCRIPTION_ID")
 
 # Time settings for monitoring interval (in seconds)
 CHECK_INTERVAL = int(os.getenv("CHECK_INTERVAL", "5"))
@@ -56,7 +56,9 @@ COMPLIANCE_LOG_FILE = os.getenv(
     str(Path(LOG_DIR) / "compliance_monitor.log"),
 )
 INCIDENT_LOG_FILE = os.getenv("INCIDENT_LOG_FILE", str(Path(LOG_DIR) / "incidents.log"))
-EXCEPTION_LOG_FILE = os.getenv("EXCEPTION_LOG_FILE", str(Path(LOG_DIR) / "exceptions.log"))
+EXCEPTION_LOG_FILE = os.getenv(
+    "EXCEPTION_LOG_FILE", str(Path(LOG_DIR) / "exceptions.log")
+)
 
 DEFAULT_EXCEPTION_MINUTES = int(os.getenv("DEFAULT_EXCEPTION_MINUTES", "30"))
 MAX_EXCEPTION_MINUTES = int(os.getenv("MAX_EXCEPTION_MINUTES", "120"))

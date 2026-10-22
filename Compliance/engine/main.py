@@ -13,12 +13,12 @@ import time
 
 from admin_listener import start_admin_listener
 from collector import (
-    collect_key_vault_security_signals,
     collect_key_vault_config,
-    collect_sql_security_signals,
+    collect_key_vault_security_signals,
     collect_sql_config,
-    collect_storage_security_signals,
+    collect_sql_security_signals,
     collect_storage_account_config,
+    collect_storage_security_signals,
     initialize_azure_clients,
 )
 from config import (
@@ -112,8 +112,12 @@ def monitor():
                 "Key Vault",
                 KEY_VAULT_NAME,
                 lambda: collect_key_vault_config(RESOURCE_GROUP, KEY_VAULT_NAME),
-                lambda config: evaluate_key_vault_config(config, EXPECTED_KEY_VAULT_CONFIG),
-                lambda: collect_key_vault_security_signals(RESOURCE_GROUP, KEY_VAULT_NAME),
+                lambda config: evaluate_key_vault_config(
+                    config, EXPECTED_KEY_VAULT_CONFIG
+                ),
+                lambda: collect_key_vault_security_signals(
+                    RESOURCE_GROUP, KEY_VAULT_NAME
+                ),
                 evaluate_key_vault_incidents,
             ),
             (
@@ -126,13 +130,22 @@ def monitor():
             ),
         ]
 
-        for service_name, resource_name, collect, evaluate, collect_signals, evaluate_incidents in checks:
+        for (
+            service_name,
+            resource_name,
+            collect,
+            evaluate,
+            collect_signals,
+            evaluate_incidents,
+        ) in checks:
             logging.info("Checking %s %s", service_name, resource_name)
 
             try:
                 current_config = collect()
                 drift_detected, issues = evaluate(current_config)
-                incident_detected, incident_issues = evaluate_incidents(collect_signals())
+                incident_detected, incident_issues = evaluate_incidents(
+                    collect_signals()
+                )
                 all_issues = issues + incident_issues
 
                 if drift_detected or incident_detected:

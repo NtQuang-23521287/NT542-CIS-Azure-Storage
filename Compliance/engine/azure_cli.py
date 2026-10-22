@@ -13,7 +13,8 @@ def _scoped_args(args: list[str]) -> list[str]:
     if not args or any(not isinstance(arg, str) or not arg for arg in args):
         raise ValueError("Azure CLI arguments must be non-empty strings")
     if any(
-        arg.lower() in {"--subscription", "-s"} or arg.lower().startswith("--subscription=")
+        arg.lower() in {"--subscription", "-s"}
+        or arg.lower().startswith("--subscription=")
         for arg in args
     ):
         raise ValueError("Azure CLI subscription cannot be overridden")
@@ -30,7 +31,9 @@ def run_az(args: list[str], timeout: int = 60) -> subprocess.CompletedProcess[st
 
     executable = shutil.which("az") or shutil.which("az.cmd") or shutil.which("az.exe")
     if not executable:
-        raise RuntimeError("Azure CLI was not found in PATH. Install it or restart the terminal.")
+        raise RuntimeError(
+            "Azure CLI was not found in PATH. Install it or restart the terminal."
+        )
 
     return subprocess.run(
         [executable, *scoped_args],

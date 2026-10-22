@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from audit_logger import log_exception_event
@@ -9,7 +9,7 @@ from config import EXCEPTIONS_FILE, MAX_EXCEPTION_MINUTES
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _parse_time(value: str) -> datetime:
@@ -17,7 +17,7 @@ def _parse_time(value: str) -> datetime:
 
 
 def _format_time(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _load_all() -> list[dict]:
@@ -38,7 +38,10 @@ def _save_all(exceptions: list[dict]) -> None:
 
 def _refresh_status(exception: dict, now: datetime | None = None) -> dict:
     now = now or _now()
-    if exception.get("status") == "active" and _parse_time(exception["expires_at"]) <= now:
+    if (
+        exception.get("status") == "active"
+        and _parse_time(exception["expires_at"]) <= now
+    ):
         exception["status"] = "expired"
     return exception
 
@@ -123,7 +126,9 @@ def find_active_exception_for_resource(resource_name: str) -> dict | None:
     return None
 
 
-def revoke_active_exceptions_for_resource(resource_name: str, reason: str) -> list[dict]:
+def revoke_active_exceptions_for_resource(
+    resource_name: str, reason: str
+) -> list[dict]:
     now = _now()
     revoked = []
     exceptions = load_exceptions()
