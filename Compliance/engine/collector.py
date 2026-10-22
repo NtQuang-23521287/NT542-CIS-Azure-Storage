@@ -66,7 +66,7 @@ def _run_az_json(args: list[str]):
         raise RuntimeError(result.stderr.strip() or result.stdout.strip())
     if not result.stdout.strip():
         return None
-    return json.loads(result.stdout.lstrip("\ufeff"))
+    return json.loads(result.stdout.lstrip("\ufeff \t\r\n"))
 
 
 def _has_private_endpoint(resource_group: str, resource_name: str, resource_type: str) -> bool:
