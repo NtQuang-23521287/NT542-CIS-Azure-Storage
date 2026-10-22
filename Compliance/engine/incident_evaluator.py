@@ -6,7 +6,6 @@ from config import (
     SENSITIVE_STORAGE_OPERATIONS,
 )
 
-
 ESCALATED_CRITICAL = "ESCALATED_CRITICAL"
 
 
@@ -25,7 +24,9 @@ def _issue(name: str, service: str, signal: dict) -> dict:
     }
 
 
-def _is_successful_sensitive_access(signal: dict, sensitive_operations: set[str]) -> bool:
+def _is_successful_sensitive_access(
+    signal: dict, sensitive_operations: set[str]
+) -> bool:
     return (
         signal.get("untrusted_source") is True
         and str(signal.get("result", "")).lower() == "success"

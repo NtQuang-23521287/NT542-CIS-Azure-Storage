@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 
 from config import (
     COMPLIANCE_LOG_FILE,
@@ -10,7 +10,6 @@ from config import (
     INCIDENT_LOG_FILE,
     LOG_DIR,
 )
-
 
 LOG_FILES = {
     "compliance": COMPLIANCE_LOG_FILE,
@@ -20,7 +19,7 @@ LOG_FILES = {
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def timestamp_for_log() -> str:

@@ -524,15 +524,17 @@ Tạo regression net trước khi thay đổi implementation.
 
 # PHASE D — P1: OFFLINE CI + QUALITY GATES [DR]
 
+Trạng thái: PR #2 đã chạy Python 3.14/Ruff/pytest/coverage xanh. Terraform CI lỗi checksum Linux thiếu trong lockfile; Trivy phát hiện jumpbox cho phép password authentication. Đã sửa tại local bằng cách bổ sung checksum Linux và dùng SSH public key, đang chờ CI chạy lại sau khi push; chưa coi checkpoint D hoàn tất.
+
 ## D1. Ruff lint/format
 
 ### Học
 - Static analysis khác test runtime như thế nào.
 
 ### Làm
-- [ ] `ruff check .`
-- [ ] `ruff format --check .`
-- [ ] Sửa lỗi thực, không spam suppressions.
+- [x] `ruff check .`
+- [x] `ruff format --check .`
+- [x] Sửa lỗi thực, không spam suppressions.
 
 ---
 
@@ -540,8 +542,8 @@ Tạo regression net trước khi thay đổi implementation.
 
 ### Làm
 - [ ] Chạy test `not live` trong CI.
-- [ ] Sinh `coverage.xml`.
-- [ ] Thiết lập coverage gate cho core decision modules.
+- [x] Sinh `coverage.xml`.
+- [x] Thiết lập coverage gate cho core decision modules.
 - [ ] Không dùng coverage % như mục tiêu duy nhất; ưu tiên state transitions và unsafe paths.
 
 ---
@@ -566,25 +568,27 @@ Tạo regression net trước khi thay đổi implementation.
 - IaC scanner kiểm security/misconfiguration khác loại lỗi.
 
 ### Làm
-- [ ] Thêm Trivy config scan.
+- [x] Thêm Trivy config scan (workflow đã cấu hình; run chưa xác nhận).
 - [ ] Thêm TFLint nếu phù hợp.
-- [ ] Define severity gate rõ ràng.
+- [x] Define severity gate rõ ràng (`HIGH,CRITICAL` → exit 1).
+
+TFLint tạm hoãn: gate hiện có `terraform validate` cho cấu hình và Trivy cho misconfiguration; chỉ thêm TFLint khi có rule Azure/provider cụ thể cần kiểm tra để tránh một dependency CI chưa có tiêu chí sử dụng.
 
 ---
 
 ## D5. GitHub Actions hardening [DR]
 
-- [ ] `permissions: contents: read` hoặc minimum cần thiết.
-- [ ] Có `concurrency` để cancel stale runs.
-- [ ] Third-party actions được review/pin phù hợp trước production-quality claim.
-- [ ] Không đưa Azure secret vào PR CI.
+- [x] `permissions: contents: read` hoặc minimum cần thiết.
+- [x] Có `concurrency` để cancel stale runs.
+- [x] Third-party actions được review/pin phù hợp trước production-quality claim.
+- [x] Không đưa Azure secret vào PR CI.
 
 ---
 
 ## D6. Dependabot / CodeQL / secret scanning [DR]
 
-- [ ] Dependabot cho Python dependencies.
-- [ ] Dependabot cho GitHub Actions.
+- [x] Dependabot cho Python dependencies.
+- [x] Dependabot cho GitHub Actions.
 - [ ] CodeQL/default code scanning nếu account/repo hỗ trợ.
 - [ ] Secret scanning/push protection nếu khả dụng.
 

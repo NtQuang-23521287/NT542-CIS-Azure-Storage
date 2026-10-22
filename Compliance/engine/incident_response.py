@@ -16,16 +16,36 @@ RESET = "\033[0m"
 
 CONTAINMENT_COMMANDS = {
     "storage": (
-        "storage", "account", "update", "--name", "{resource}",
-        "--resource-group", "{rg}", "--public-network-access", "Disabled",
+        "storage",
+        "account",
+        "update",
+        "--name",
+        "{resource}",
+        "--resource-group",
+        "{rg}",
+        "--public-network-access",
+        "Disabled",
     ),
     "key_vault": (
-        "keyvault", "update", "--name", "{resource}", "--resource-group", "{rg}",
-        "--public-network-access", "Disabled",
+        "keyvault",
+        "update",
+        "--name",
+        "{resource}",
+        "--resource-group",
+        "{rg}",
+        "--public-network-access",
+        "Disabled",
     ),
     "sql": (
-        "sql", "server", "update", "--name", "{resource}",
-        "--resource-group", "{rg}", "--enable-public-network", "false",
+        "sql",
+        "server",
+        "update",
+        "--name",
+        "{resource}",
+        "--resource-group",
+        "{rg}",
+        "--enable-public-network",
+        "false",
     ),
 }
 

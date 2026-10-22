@@ -34,15 +34,28 @@ SEVERITY = {
     "SQL suspicious successful login": ESCALATED_CRITICAL,
 }
 
-STORAGE_FIELDS = {"https_only", "min_tls_version", "public_network_access", "versioning_enabled"}
+STORAGE_FIELDS = {
+    "https_only",
+    "min_tls_version",
+    "public_network_access",
+    "versioning_enabled",
+}
 KEY_VAULT_FIELDS = {
-    "public_network_access", "enable_rbac_authorization", "enable_soft_delete",
-    "enable_purge_protection", "private_endpoint_enabled", "keys_have_expiry",
+    "public_network_access",
+    "enable_rbac_authorization",
+    "enable_soft_delete",
+    "enable_purge_protection",
+    "private_endpoint_enabled",
+    "keys_have_expiry",
     "secrets_have_expiry",
 }
 SQL_FIELDS = {
-    "auditing_enabled", "defender_enabled", "min_tls_version",
-    "public_network_access", "private_endpoint_enabled", "azure_ad_admin_configured",
+    "auditing_enabled",
+    "defender_enabled",
+    "min_tls_version",
+    "public_network_access",
+    "private_endpoint_enabled",
+    "azure_ad_admin_configured",
 }
 
 
@@ -80,10 +93,15 @@ def evaluate_config(actual_config: dict, expected_config: dict):
     if actual_config["min_tls_version"] != expected_config["min_tls_version"]:
         _add_issue(issues, "Minimum TLS version mismatch", "storage")
 
-    if actual_config["public_network_access"] != expected_config["public_network_access"]:
+    if (
+        actual_config["public_network_access"]
+        != expected_config["public_network_access"]
+    ):
         _add_issue(issues, "Public Network Access mismatch", "storage")
 
-    if actual_config.get("versioning_enabled") != expected_config.get("versioning_enabled"):
+    if actual_config.get("versioning_enabled") != expected_config.get(
+        "versioning_enabled"
+    ):
         _add_issue(issues, "Blob versioning disabled", "storage")
 
     return bool(issues), issues
@@ -94,19 +112,29 @@ def evaluate_key_vault_config(actual_config: dict, expected_config: dict):
     _validate_config(actual_config, expected_config, KEY_VAULT_FIELDS)
     issues = []
 
-    if actual_config["public_network_access"] != expected_config["public_network_access"]:
+    if (
+        actual_config["public_network_access"]
+        != expected_config["public_network_access"]
+    ):
         _add_issue(issues, "Key Vault Public Network Access mismatch", "key_vault")
 
-    if actual_config["enable_rbac_authorization"] != expected_config["enable_rbac_authorization"]:
+    if (
+        actual_config["enable_rbac_authorization"]
+        != expected_config["enable_rbac_authorization"]
+    ):
         _add_issue(issues, "Key Vault RBAC authorization disabled", "key_vault")
 
     if (
         actual_config["enable_soft_delete"] != expected_config["enable_soft_delete"]
-        or actual_config["enable_purge_protection"] != expected_config["enable_purge_protection"]
+        or actual_config["enable_purge_protection"]
+        != expected_config["enable_purge_protection"]
     ):
         _add_issue(issues, "Key Vault recoverability mismatch", "key_vault")
 
-    if actual_config["private_endpoint_enabled"] != expected_config["private_endpoint_enabled"]:
+    if (
+        actual_config["private_endpoint_enabled"]
+        != expected_config["private_endpoint_enabled"]
+    ):
         _add_issue(issues, "Key Vault Private Endpoint missing", "key_vault")
 
     if actual_config["keys_have_expiry"] != expected_config["keys_have_expiry"]:
@@ -132,13 +160,22 @@ def evaluate_sql_config(actual_config: dict, expected_config: dict):
     if actual_config["min_tls_version"] != expected_config["min_tls_version"]:
         _add_issue(issues, "SQL Minimum TLS version mismatch", "sql")
 
-    if actual_config["public_network_access"] != expected_config["public_network_access"]:
+    if (
+        actual_config["public_network_access"]
+        != expected_config["public_network_access"]
+    ):
         _add_issue(issues, "SQL Public Network Access mismatch", "sql")
 
-    if actual_config["private_endpoint_enabled"] != expected_config["private_endpoint_enabled"]:
+    if (
+        actual_config["private_endpoint_enabled"]
+        != expected_config["private_endpoint_enabled"]
+    ):
         _add_issue(issues, "SQL Private Endpoint missing", "sql")
 
-    if actual_config["azure_ad_admin_configured"] != expected_config["azure_ad_admin_configured"]:
+    if (
+        actual_config["azure_ad_admin_configured"]
+        != expected_config["azure_ad_admin_configured"]
+    ):
         _add_issue(issues, "SQL Azure AD admin missing", "sql")
 
     return bool(issues), issues

@@ -41,7 +41,9 @@ def _handle_exception(parts: list[str]) -> None:
     options = _parse_options(parts)
     resource_type = _prompt_missing(options, "resource_type", "resource_type")
     resource_name = _prompt_missing(options, "resource_name", "resource_name")
-    issue_name = options.get("issue") or _prompt_missing(options, "issue_name", "issue_name")
+    issue_name = options.get("issue") or _prompt_missing(
+        options, "issue_name", "issue_name"
+    )
     duration_text = options.get("duration") or _prompt_missing(
         options, "duration_minutes", "duration_minutes"
     )

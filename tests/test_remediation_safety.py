@@ -1,15 +1,14 @@
-from pathlib import Path
 import sys
+from pathlib import Path
 from unittest import TestCase
 from unittest.mock import patch
-
 
 ENGINE_DIR = Path(__file__).resolve().parents[1] / "Compliance" / "engine"
 sys.path.insert(0, str(ENGINE_DIR))
 
-import remediation  # noqa: E402
-import incident_response  # noqa: E402
 import azure_cli  # noqa: E402
+import incident_response  # noqa: E402
+import remediation  # noqa: E402
 
 
 class RemediationSafetyTests(TestCase):
@@ -17,7 +16,11 @@ class RemediationSafetyTests(TestCase):
         issue = {"name": "Public Network Access mismatch", "severity": "CRITICAL"}
 
         with (
-            patch.object(azure_cli, "AZURE_SUBSCRIPTION_ID", "00000000-0000-0000-0000-000000000001"),
+            patch.object(
+                azure_cli,
+                "AZURE_SUBSCRIPTION_ID",
+                "00000000-0000-0000-0000-000000000001",
+            ),
             patch.object(remediation, "find_active_exception", return_value=None),
             patch.object(remediation, "_run_command") as run_command,
             patch.object(remediation, "log_compliance_event"),
@@ -30,7 +33,11 @@ class RemediationSafetyTests(TestCase):
         issue = {"name": "Suspicious access", "service": "storage"}
 
         with (
-            patch.object(azure_cli, "AZURE_SUBSCRIPTION_ID", "00000000-0000-0000-0000-000000000001"),
+            patch.object(
+                azure_cli,
+                "AZURE_SUBSCRIPTION_ID",
+                "00000000-0000-0000-0000-000000000001",
+            ),
             patch.object(incident_response, "run_az") as run_az,
         ):
             status, command = incident_response._run_containment(
