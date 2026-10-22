@@ -80,6 +80,18 @@ terraform validate -no-color
 
 Pytest mặc định bỏ qua test gắn marker `live`; dùng `python -m pytest -m "not live"` để kiểm tra tường minh. Các test Phase C dùng fixture/mock và không đăng nhập hay tạo tài nguyên Azure.
 
+## Jumpbox SSH key
+
+Jumpbox private cần `jumpbox_ssh_public_key` và không cho đăng nhập bằng mật khẩu. Trước lần `terraform plan/apply` sau này, tạo cặp khóa trên máy của bạn; chỉ đưa public key cho Terraform. Trong PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.ssh" | Out-Null
+ssh-keygen -t rsa -b 4096 -f "$env:USERPROFILE\.ssh\nt542_jumpbox"
+$env:TF_VAR_jumpbox_ssh_public_key = (Get-Content "$env:USERPROFILE\.ssh\nt542_jumpbox.pub" -Raw).Trim()
+```
+
+Giữ private key và passphrase ngoài Git, `.tfvars` và Terraform state. Biến môi trường trên chỉ tồn tại trong phiên terminal hiện tại. VM không có public IP; kết nối qua Point-to-Site VPN. Nếu VM đã tồn tại, đổi từ mật khẩu sang SSH key có thể khiến Terraform thay thế VM; phải đọc plan trước khi apply.
+
 ## Offline CI (Phase D)
 
 `.github/workflows/ci.yml` chạy trên mọi pull request và mỗi push vào `main`: Ruff lint/format, pytest offline với ngưỡng coverage 80% cho bốn module quyết định, Terraform fmt/init/validate và Trivy config scan (chặn finding `HIGH`/`CRITICAL`). Workflow không khai báo Azure credential, không gọi `az login`, `terraform plan`, `apply` hoặc `destroy`. `terraform validate` kiểm tra cấu hình nội bộ, không chứng minh tài nguyên live hoặc mức độ tuân thủ CIS.

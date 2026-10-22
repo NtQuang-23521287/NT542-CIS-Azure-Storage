@@ -128,12 +128,6 @@ output "jumpbox_admin_username" {
   value       = azurerm_linux_virtual_machine.jumpbox.admin_username
 }
 
-output "jumpbox_admin_password" {
-  description = "Generated administrator password for the private management VM"
-  value       = random_password.jumpbox_admin.result
-  sensitive   = true
-}
-
 output "sql_admin_password" {
   description = "Generated SQL admin password"
   value       = random_password.sql_admin.result

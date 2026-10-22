@@ -1,12 +1,6 @@
 # Private management VM used as a jumpbox after the admin workstation connects
 # to the Point-to-Site VPN. This VM has no public IP.
 
-resource "random_password" "jumpbox_admin" {
-  length           = 20
-  special          = true
-  override_special = "_%@"
-}
-
 resource "azurerm_network_security_group" "jumpbox_nsg" {
   name                = "${var.jumpbox_vm_name}-nsg"
   location            = var.location
@@ -53,9 +47,13 @@ resource "azurerm_linux_virtual_machine" "jumpbox" {
   size                = var.jumpbox_vm_size
   computer_name       = replace(var.jumpbox_vm_name, "_", "-")
   admin_username      = var.jumpbox_admin_username
-  admin_password      = random_password.jumpbox_admin.result
 
-  disable_password_authentication = false
+  disable_password_authentication = true
+
+  admin_ssh_key {
+    username   = var.jumpbox_admin_username
+    public_key = trimspace(var.jumpbox_ssh_public_key)
+  }
 
   network_interface_ids = [
     azurerm_network_interface.jumpbox_nic.id,

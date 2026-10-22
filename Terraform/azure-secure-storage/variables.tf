@@ -186,6 +186,16 @@ variable "jumpbox_admin_username" {
   default     = "azureadmin"
 }
 
+variable "jumpbox_ssh_public_key" {
+  description = "SSH RSA public key for the private management VM; keep the private key outside Terraform and Git"
+  type        = string
+
+  validation {
+    condition     = startswith(trimspace(var.jumpbox_ssh_public_key), "ssh-rsa ")
+    error_message = "jumpbox_ssh_public_key must be an OpenSSH RSA public key."
+  }
+}
+
 variable "log_retention_days" {
   description = "Retention period in days for Log Analytics Workspace"
   type        = number

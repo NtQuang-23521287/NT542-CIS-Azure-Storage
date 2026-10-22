@@ -524,7 +524,7 @@ Tạo regression net trước khi thay đổi implementation.
 
 # PHASE D — P1: OFFLINE CI + QUALITY GATES [DR]
 
-Trạng thái: đã cấu hình và kiểm tra Ruff/pytest/coverage/Terraform validate tại máy local; chưa có GitHub Actions run để xác nhận Trivy, Python 3.14 và CI badge. `terraform init` local bị chặn kết nối Terraform Registry, không phải lỗi HCL. Chưa coi checkpoint D hoàn tất.
+Trạng thái: PR #2 đã chạy Python 3.14/Ruff/pytest/coverage xanh. Terraform CI lỗi checksum Linux thiếu trong lockfile; Trivy phát hiện jumpbox cho phép password authentication. Đã sửa tại local bằng cách bổ sung checksum Linux và dùng SSH public key, đang chờ CI chạy lại sau khi push; chưa coi checkpoint D hoàn tất.
 
 ## D1. Ruff lint/format
 
