@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "ground_truth_basis": "Human-reviewed expected values recorded before comparator output",
+  "cases": [
+    {
+      "id": "ACG-VAL-STO-SECURE-001",
+      "fixture": "storage_secure.json",
+      "expected_result": "PASS",
+      "expected_finding_ids": [],
+      "cleanup": "Not applicable; sanitized offline fixture"
+    },
+    {
+      "id": "ACG-VAL-STO-DRIFT-001",
+      "fixture": "storage_drift.json",
+      "expected_result": "FAIL",
+      "expected_finding_ids": [
+        "ACG-STO-001",
+        "ACG-STO-002",
+        "ACG-STO-003",
+        "ACG-STO-004"
+      ],
+      "cleanup": "Not applicable; sanitized offline fixture"
+    }
+  ]
+}

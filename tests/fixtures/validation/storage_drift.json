@@ -1,0 +1,16 @@
+{
+  "resource_group": "rg-acg-validation",
+  "storage_accounts": [
+    {
+      "name": "stdriftcase",
+      "account": {
+        "supportsHttpsTrafficOnly": false,
+        "minimumTlsVersion": "TLS1_0",
+        "publicNetworkAccess": "Enabled"
+      },
+      "blob_service": {
+        "isVersioningEnabled": false
+      }
+    }
+  ]
+}
