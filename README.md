@@ -40,13 +40,14 @@ Storage được đọc bằng Azure SDK. Key Vault và SQL hiện dùng Azure C
 ## Cấu trúc repository
 
 ```text
-Compliance/engine/                 Python monitoring engine
+src/azure_compliance_guard/       Installable CLI and typed scan engine
+Compliance/engine/                Legacy monitoring/remediation workflows
 Terraform/azure-secure-storage/   Terraform root module
 tests/                             Offline safety tests
 docs/                              Audit, architecture và report gốc
 ```
 
-Entrypoint hiện tại là `Compliance/engine/main.py`. Terraform root là `Terraform/azure-secure-storage`.
+Entrypoint Phase E là `acg`; legacy monitor vẫn ở `Compliance/engine/main.py` trong thời gian migrate tăng dần. Terraform root là `Terraform/azure-secure-storage`.
 
 ## Kiểm chứng offline
 
@@ -80,7 +81,7 @@ terraform validate -no-color
 
 Pytest mặc định bỏ qua test gắn marker `live`; dùng `python -m pytest -m "not live"` để kiểm tra tường minh. Các test Phase C dùng fixture/mock và không đăng nhập hay tạo tài nguyên Azure.
 
-## Phase E CLI (Storage offline slice)
+## Phase E CLI (offline scan scope)
 
 The installable CLI uses the `src/azure_compliance_guard` package while the
 legacy monitor remains available during the incremental migration. Install the
@@ -99,18 +100,28 @@ and confirms that Azure mutation is disabled by default:
 acg doctor
 ```
 
-The deterministic offline scan uses the packaged intentional-drift fixture and
-the versioned Storage rule catalog:
+The deterministic offline scan supports Storage, Key Vault, SQL, or all three
+services. It uses packaged intentional-drift fixtures and schema-v1 rule
+catalogs by default:
 
 ```powershell
 acg scan --source fixture
 acg scan --source fixture --format json
+acg scan --source fixture --service all --format json
+acg watch --source fixture --service all --interval 60
+acg watch --source fixture --service sql --format jsonl --iterations 2
 ```
+
+`scan` always performs one collection cycle and exits. `watch` is the explicit
+continuous mode; `--iterations` makes it bounded for automation and `jsonl`
+emits one complete JSON document per cycle. Azure mode uses the Storage SDK and
+read-only Azure CLI adapters for Key Vault and SQL. Every CLI call is bound to
+the validated `AZURE_SUBSCRIPTION_ID` and uses `shell=False`.
 
 CLI exit codes are stable: `0` means no blocking findings, `1` means policy
 findings were detected, `2` means an operational/runtime failure, and `3` means
 invalid configuration or rules. The packaged drift fixture intentionally exits
-with `1`. Current scope and deferred Phase E work are recorded in
+with `1`. Current offline scope and deferred live-validation work are recorded in
 [`docs/phase-e-status.md`](docs/phase-e-status.md).
 
 ## Jumpbox SSH key
@@ -167,8 +178,8 @@ Không commit `.env`, Terraform state, `*.tfvars`, log, database hoặc private 
 
 ## Known limitations
 
-- Chưa có CLI chuẩn hóa; monitor vẫn là vòng lặp liên tục.
-- Rule và expected state còn hard-code trong Python, chưa chuyển sang YAML có schema.
+- CLI mới đã chuẩn hóa `doctor`, `scan` và `watch`; các workflow remediation, incident, exception và evidence cũ chưa được migrate sang package mới.
+- Storage, Key Vault và SQL đã có 17 rule YAML schema-v1; mapping CIS/Azure Policy/Prowler vẫn chưa được xác minh bằng nguồn pinned và lab live.
 - Chưa có approval artifact, stale-plan protection, rollback hoặc verification loop.
 - Incident detection vẫn dựa trên fixture local, chưa phải Azure Monitor/KQL.
 - Exception state và evidence còn dùng file local; chưa có SQLite/HTML report.
