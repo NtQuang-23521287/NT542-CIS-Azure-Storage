@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "nt542-cis-azure-storage"
 version = "0.1.0"
@@ -8,6 +12,7 @@ dependencies = [
     "azure-mgmt-resource>=25,<26",
     "azure-mgmt-storage>=25,<26",
     "python-dotenv>=1.2.2,<2",
+    "pyyaml>=6.0.3,<7",
 ]
 
 [project.optional-dependencies]
@@ -20,7 +25,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["Compliance/engine"]
+pythonpath = ["src", "Compliance/engine"]
 addopts = "-m 'not live'"
 markers = [
     "integration: offline tests crossing module or file boundaries",
@@ -32,3 +37,9 @@ target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+azure_compliance_guard = ["rules/*.yaml", "fixtures/*.json"]
