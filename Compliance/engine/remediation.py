@@ -4,7 +4,7 @@ Handle compliance issues by severity.
 WARNING:
   Log/report for admin review.
 CRITICAL:
-  Produce a plan by default. Execution requires explicit operator opt-in.
+  Produce a plan. Execution belongs to the new exact-plan CLI workflow.
 ESCALATED_CRITICAL:
   Trigger incident response. Azure containment is plan-only by default.
 """
@@ -12,7 +12,7 @@ ESCALATED_CRITICAL:
 import logging
 
 from audit_logger import log_compliance_event, log_exception_event
-from azure_cli import display_az_command, run_az
+from azure_cli import display_az_command
 from exception_manager import find_active_exception, remaining_minutes
 from incident_response import handle_incident
 
@@ -149,40 +149,9 @@ def _render_args(
 
 
 def _run_command(args: list[str], issue_name: str, resource_name: str) -> bool:
-    command = display_az_command(args)
-    logging.info("[REMEDIATION] Running: %s", command)
-    result = run_az(args)
-
-    if result.returncode == 0:
-        msg = f"[REMEDIATION] Success: {issue_name}"
-        print(f"{GREEN}{msg}{RESET}")
-        logging.info(msg)
-        log_compliance_event(
-            "AUTO_REMEDIATION_SUCCESS",
-            {
-                "Resource": resource_name,
-                "Issue": issue_name,
-                "Command": command,
-                "Result": "SUCCESS",
-            },
-        )
-        return True
-
-    error = result.stderr.strip() or result.stdout.strip()
-    msg = f"[REMEDIATION] Failed: {issue_name}. Error: {error}"
-    print(f"{RED}{msg}{RESET}")
-    logging.error(msg)
-    log_compliance_event(
-        "AUTO_REMEDIATION_FAILED",
-        {
-            "Resource": resource_name,
-            "Issue": issue_name,
-            "Command": command,
-            "Result": "FAILED",
-            "Error": error,
-        },
+    raise RuntimeError(
+        "Legacy remediation execution is disabled; use acg remediation apply"
     )
-    return False
 
 
 def _handle_warning(resource_name: str, issue: dict) -> None:
@@ -271,47 +240,25 @@ def _handle_critical(
 
     args = _render_args(command_template, resource_group, resource_name)
     command = display_az_command(args)
-    if not allow_mutation:
-        print(
-            f"\n{YELLOW}{BOLD}[CRITICAL] Remediation plan created{RESET}\n"
-            f"  Resource : {resource_name} ({resource_group})\n"
-            f"  Issue    : {name}\n"
-            f"  Plan     : {command}\n"
-            "  Action   : not executed; explicit operator opt-in is required\n"
-        )
-        logging.warning(
-            "[CRITICAL] Plan-only remediation for %s on %s", name, resource_name
-        )
-        log_compliance_event(
-            "REMEDIATION_PLAN_CREATED",
-            {
-                "Resource": resource_name,
-                "Issue": name,
-                "Action": "EXPLICIT_OPT_IN_REQUIRED",
-                "Command": command,
-            },
-        )
-        return
-
     print(
-        f"\n{RED}{BOLD}[CRITICAL] Dangerous drift detected{RESET}\n"
+        f"\n{YELLOW}{BOLD}[CRITICAL] Legacy remediation suggestion{RESET}\n"
         f"  Resource : {resource_name} ({resource_group})\n"
         f"  Issue    : {name}\n"
-        "  Action   : executing because Azure mutation was explicitly enabled\n"
+        f"  Suggested: {command}\n"
+        "  Action   : not executed; create an exact plan with acg remediation plan\n"
     )
     logging.warning(
-        "[CRITICAL] Executing opted-in remediation %s on %s", name, resource_name
+        "[CRITICAL] Legacy plan-only remediation for %s on %s", name, resource_name
     )
     log_compliance_event(
-        "CRITICAL_DETECTED",
+        "REMEDIATION_PLAN_CREATED",
         {
             "Resource": resource_name,
             "Issue": name,
-            "Action": "EXECUTE_EXPLICIT_OPT_IN",
+            "Action": "EXACT_PLAN_REQUIRED",
             "Command": command,
         },
     )
-    _run_command(args, name, resource_name)
 
 
 def remediate_config(

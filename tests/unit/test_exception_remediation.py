@@ -1,6 +1,5 @@
 import json
 from datetime import UTC, datetime, timedelta
-from subprocess import CompletedProcess
 
 import exception_manager
 import incident_evaluator
@@ -134,35 +133,11 @@ def test_incident_revokes_exception_and_logs_plan_without_azure(monkeypatch):
     assert events[0][1]["Revoked"] == "1 active exception(s)"
 
 
-@pytest.mark.parametrize(
-    ("returncode", "expected_event", "expected_result"),
-    [(0, "AUTO_REMEDIATION_SUCCESS", True), (2, "AUTO_REMEDIATION_FAILED", False)],
-)
-def test_remediation_execution_records_success_or_failure(
-    monkeypatch, returncode, expected_event, expected_result
-):
-    events = []
-    monkeypatch.setattr(
-        remediation, "display_az_command", lambda args: "az storage account update"
-    )
-    monkeypatch.setattr(
-        remediation,
-        "run_az",
-        lambda args: CompletedProcess(args, returncode, "", "denied"),
-    )
-    monkeypatch.setattr(
-        remediation,
-        "log_compliance_event",
-        lambda title, fields: events.append((title, fields)),
-    )
-
-    result = remediation._run_command(
-        ["storage", "account", "update"], "PNA drift", "storage-demo"
-    )
-
-    assert result is expected_result
-    assert events[0][0] == expected_event
-    assert events[0][1]["Result"] == ("SUCCESS" if expected_result else "FAILED")
+def test_legacy_remediation_executor_is_disabled():
+    with pytest.raises(RuntimeError, match="Legacy remediation execution is disabled"):
+        remediation._run_command(
+            ["storage", "account", "update"], "PNA drift", "storage-demo"
+        )
 
 
 def test_active_exception_skips_remediation_and_records_evidence(monkeypatch):
