@@ -27,6 +27,52 @@ rules:
       fields: [https_only]
 """
 
+VALID_KEY_VAULT_RULE = """
+schema_version: 1
+rules:
+  - id: ACG-KV-001
+    title: Disable Key Vault public network access
+    service: key_vault
+    severity: CRITICAL
+    framework:
+      name: CIS Microsoft Azure Foundations Benchmark
+      version: 3.0.0
+      control: null
+    selector:
+      field: public_network_access
+    assertion:
+      operator: equals
+      expected: Disabled
+    remediation:
+      handler: disable_key_vault_public_network_access
+      default_mode: plan_only
+    evidence:
+      fields: [public_network_access]
+"""
+
+VALID_SQL_RULE = """
+schema_version: 1
+rules:
+  - id: ACG-SQL-001
+    title: Enable SQL auditing
+    service: sql
+    severity: CRITICAL
+    framework:
+      name: CIS Microsoft Azure Foundations Benchmark
+      version: 3.0.0
+      control: null
+    selector:
+      field: auditing_enabled
+    assertion:
+      operator: equals
+      expected: true
+    remediation:
+      handler: enable_sql_auditing
+      default_mode: plan_only
+    evidence:
+      fields: [auditing_enabled]
+"""
+
 
 def _write_rule_file(tmp_path: Path, content: str) -> Path:
     path = tmp_path / "rules.yaml"
@@ -41,6 +87,31 @@ def test_rule_loader_returns_typed_versioned_rules(tmp_path):
     assert [rule.id for rule in catalog.rules] == ["ACG-STO-001"]
     assert catalog.rules[0].assertion.operator == "equals"
     assert catalog.rules[0].framework.control is None
+
+
+@pytest.mark.parametrize(
+    ("content", "service", "field"),
+    [
+        (VALID_KEY_VAULT_RULE, "key_vault", "public_network_access"),
+        (VALID_SQL_RULE, "sql", "auditing_enabled"),
+    ],
+)
+def test_rule_loader_accepts_allowlisted_service_contracts(
+    tmp_path, content, service, field
+):
+    catalog = load_rule_catalog(_write_rule_file(tmp_path, content))
+
+    assert catalog.rules[0].service == service
+    assert catalog.rules[0].field == field
+
+
+def test_rule_loader_rejects_field_from_another_service(tmp_path):
+    content = VALID_KEY_VAULT_RULE.replace(
+        "field: public_network_access", "field: auditing_enabled"
+    ).replace("fields: [public_network_access]", "fields: [auditing_enabled]")
+
+    with pytest.raises(InvalidRuleSetError, match="selector field"):
+        load_rule_catalog(_write_rule_file(tmp_path, content))
 
 
 def test_rule_loader_rejects_malformed_yaml(tmp_path):

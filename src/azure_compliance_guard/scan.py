@@ -1,11 +1,11 @@
 from collections.abc import Iterable
 
-from azure_compliance_guard.models import Finding, StorageState
+from azure_compliance_guard.models import Finding, ResourceState
 from azure_compliance_guard.rules import RuleCatalog
 
 
 def evaluate_states(
-    states: Iterable[StorageState], catalog: RuleCatalog
+    states: Iterable[ResourceState], catalog: RuleCatalog
 ) -> list[Finding]:
     findings = []
     for state in states:

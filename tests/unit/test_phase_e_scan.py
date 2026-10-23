@@ -9,8 +9,13 @@ from azure_compliance_guard.collectors import (
     FixtureStorageCollector,
     InvalidFixtureError,
 )
-from azure_compliance_guard.models import ResourceRef, StorageState
-from azure_compliance_guard.rules import load_default_rule_catalog
+from azure_compliance_guard.models import (
+    KeyVaultState,
+    ResourceRef,
+    SqlState,
+    StorageState,
+)
+from azure_compliance_guard.rules import load_default_rule_catalog, load_rule_catalog
 from azure_compliance_guard.scan import evaluate_states
 
 
@@ -153,3 +158,53 @@ def test_fixture_collector_rejects_string_boolean(tmp_path):
 
     with pytest.raises(InvalidFixtureError, match="supportsHttpsTrafficOnly"):
         FixtureStorageCollector(path).collect()
+
+
+def test_rule_engine_evaluates_normalized_key_vault_state(tmp_path):
+    rules = tmp_path / "key-vault.yaml"
+    rules.write_text(
+        """
+schema_version: 1
+rules:
+  - id: ACG-KV-001
+    title: Disable Key Vault public network access
+    service: key_vault
+    severity: CRITICAL
+    framework: {name: Internal baseline, version: '1', control: null}
+    selector: {field: public_network_access}
+    assertion: {operator: equals, expected: Disabled}
+    remediation:
+      handler: disable_key_vault_public_network_access
+      default_mode: plan_only
+    evidence: {fields: [public_network_access]}
+""",
+        encoding="utf-8",
+    )
+    state = KeyVaultState(
+        resource=ResourceRef("key_vault", "rg-demo", "kv-demo"),
+        public_network_access="Enabled",
+        rbac_authorization_enabled=True,
+        purge_protection_enabled=True,
+        soft_delete_enabled=True,
+        private_endpoint_enabled=True,
+        keys_have_expiry=True,
+        secrets_have_expiry=True,
+    )
+
+    findings = evaluate_states([state], load_rule_catalog(rules))
+
+    assert [finding.rule_id for finding in findings] == ["ACG-KV-001"]
+
+
+def test_sql_state_exposes_typed_rule_facts():
+    state = SqlState(
+        resource=ResourceRef("sql", "rg-demo", "sql-demo"),
+        auditing_enabled=True,
+        defender_enabled=False,
+        min_tls_version="1.2",
+        public_network_access="Disabled",
+        private_endpoint_enabled=True,
+        azure_ad_admin_configured=True,
+    )
+
+    assert state.facts()["defender_enabled"] is False

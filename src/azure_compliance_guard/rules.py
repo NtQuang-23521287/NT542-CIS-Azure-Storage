@@ -72,23 +72,60 @@ def load_default_rule_catalog() -> RuleCatalog:
 
 
 ALLOWED_OPERATORS = {"equals"}
-ALLOWED_HANDLERS = {
-    "enable_https_only",
-    "set_minimum_tls_1_2",
-    "disable_public_network_access",
-    "enable_blob_versioning",
+SERVICE_FIELD_TYPES = {
+    "storage": {
+        "https_only": bool,
+        "min_tls_version": str,
+        "public_network_access": str,
+        "versioning_enabled": bool,
+    },
+    "key_vault": {
+        "public_network_access": str,
+        "rbac_authorization_enabled": bool,
+        "purge_protection_enabled": bool,
+        "soft_delete_enabled": bool,
+        "private_endpoint_enabled": bool,
+        "keys_have_expiry": bool,
+        "secrets_have_expiry": bool,
+    },
+    "sql": {
+        "auditing_enabled": bool,
+        "defender_enabled": bool,
+        "min_tls_version": str,
+        "public_network_access": str,
+        "private_endpoint_enabled": bool,
+        "azure_ad_admin_configured": bool,
+    },
 }
-STORAGE_FIELDS = {
-    "https_only",
-    "min_tls_version",
-    "public_network_access",
-    "versioning_enabled",
+SERVICE_HANDLERS = {
+    "storage": {
+        "enable_https_only",
+        "set_minimum_tls_1_2",
+        "disable_public_network_access",
+        "enable_blob_versioning",
+    },
+    "key_vault": {
+        "disable_key_vault_public_network_access",
+        "enable_key_vault_rbac",
+        "enable_key_vault_purge_protection",
+        "enable_key_vault_soft_delete",
+        "configure_key_vault_private_endpoint",
+        "set_key_expiry",
+        "set_secret_expiry",
+    },
+    "sql": {
+        "enable_sql_auditing",
+        "enable_defender_for_sql",
+        "set_sql_minimum_tls_1_2",
+        "disable_sql_public_network_access",
+        "configure_sql_private_endpoint",
+        "configure_sql_azure_ad_admin",
+    },
 }
-EXPECTED_TYPES = {
-    "https_only": bool,
-    "min_tls_version": str,
-    "public_network_access": str,
-    "versioning_enabled": bool,
+SERVICE_ID_PREFIX = {
+    "storage": "ACG-STO-",
+    "key_vault": "ACG-KV-",
+    "sql": "ACG-SQL-",
 }
 RULE_ID_PATTERN = re.compile(r"^ACG-[A-Z]+-[0-9]{3}$")
 
@@ -178,26 +215,29 @@ def _parse_rule(value: Any, index: int) -> Rule:
     if operator not in ALLOWED_OPERATORS:
         raise InvalidRuleSetError(f"unknown assertion operator: {operator!r}")
 
-    handler = _required(remediation, "handler", f"{label}.remediation")
-    if handler not in ALLOWED_HANDLERS:
-        raise InvalidRuleSetError(f"unknown remediation handler: {handler!r}")
-
+    service = _required_string(raw, "service", label)
+    if service not in SERVICE_FIELD_TYPES:
+        raise InvalidRuleSetError(f"{label}.service is unsupported")
+    service_fields = SERVICE_FIELD_TYPES[service]
     field = _required(selector, "field", f"{label}.selector")
-    if field not in STORAGE_FIELDS:
-        raise InvalidRuleSetError(f"unknown storage selector field: {field!r}")
+    if field not in service_fields:
+        raise InvalidRuleSetError(f"unknown {service} selector field: {field!r}")
+
+    handler = _required(remediation, "handler", f"{label}.remediation")
+    if handler not in SERVICE_HANDLERS[service]:
+        raise InvalidRuleSetError(f"unknown remediation handler: {handler!r}")
 
     evidence_fields = _required(evidence, "fields", f"{label}.evidence")
     if not isinstance(evidence_fields, list) or not evidence_fields:
         raise InvalidRuleSetError(f"{label}.evidence.fields must be a non-empty list")
-    if any(item not in STORAGE_FIELDS for item in evidence_fields):
+    if any(item not in service_fields for item in evidence_fields):
         raise InvalidRuleSetError(f"{label}.evidence.fields contains an unknown field")
 
     rule_id = _required(raw, "id", label)
     if not isinstance(rule_id, str) or not RULE_ID_PATTERN.fullmatch(rule_id):
         raise InvalidRuleSetError(f"{label} has invalid rule ID")
-    service = _required_string(raw, "service", label)
-    if service != "storage":
-        raise InvalidRuleSetError(f"{label}.service must be 'storage'")
+    if not rule_id.startswith(SERVICE_ID_PREFIX[service]):
+        raise InvalidRuleSetError(f"{label} rule ID does not match its service")
     severity = _required_string(raw, "severity", label)
     if severity not in {"WARNING", "CRITICAL"}:
         raise InvalidRuleSetError(f"{label}.severity is unsupported")
@@ -205,7 +245,7 @@ def _parse_rule(value: Any, index: int) -> Rule:
     if default_mode not in {"plan_only", "manual_only"}:
         raise InvalidRuleSetError(f"{label}.remediation.default_mode is unsupported")
     expected = _required(assertion, "expected", f"{label}.assertion")
-    if not isinstance(expected, EXPECTED_TYPES[field]):
+    if not isinstance(expected, service_fields[field]):
         raise InvalidRuleSetError(f"{label}.assertion has invalid expected value type")
     control = framework.get("control")
     if control is not None and not isinstance(control, str):
