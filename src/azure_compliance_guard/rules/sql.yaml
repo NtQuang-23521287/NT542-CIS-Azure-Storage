@@ -1,0 +1,61 @@
+schema_version: 1
+rules:
+  - id: ACG-SQL-001
+    title: Enable SQL auditing
+    service: sql
+    severity: CRITICAL
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: auditing_enabled}
+    assertion: {operator: equals, expected: true}
+    remediation: {handler: enable_sql_auditing, default_mode: plan_only}
+    evidence: {fields: [auditing_enabled]}
+
+  - id: ACG-SQL-002
+    title: Enable Microsoft Defender for SQL
+    service: sql
+    severity: CRITICAL
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: defender_enabled}
+    assertion: {operator: equals, expected: true}
+    remediation: {handler: enable_defender_for_sql, default_mode: manual_only}
+    evidence: {fields: [defender_enabled]}
+
+  - id: ACG-SQL-003
+    title: Require SQL minimum TLS 1.2
+    service: sql
+    severity: CRITICAL
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: min_tls_version}
+    assertion: {operator: equals, expected: "1.2"}
+    remediation: {handler: set_sql_minimum_tls_1_2, default_mode: plan_only}
+    evidence: {fields: [min_tls_version]}
+
+  - id: ACG-SQL-004
+    title: Disable SQL public network access
+    service: sql
+    severity: CRITICAL
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: public_network_access}
+    assertion: {operator: equals, expected: Disabled}
+    remediation: {handler: disable_sql_public_network_access, default_mode: plan_only}
+    evidence: {fields: [public_network_access]}
+
+  - id: ACG-SQL-005
+    title: Require a SQL private endpoint
+    service: sql
+    severity: CRITICAL
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: private_endpoint_enabled}
+    assertion: {operator: equals, expected: true}
+    remediation: {handler: configure_sql_private_endpoint, default_mode: manual_only}
+    evidence: {fields: [private_endpoint_enabled]}
+
+  - id: ACG-SQL-006
+    title: Configure a SQL Azure AD administrator
+    service: sql
+    severity: WARNING
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: azure_ad_admin_configured}
+    assertion: {operator: equals, expected: true}
+    remediation: {handler: configure_sql_azure_ad_admin, default_mode: manual_only}
+    evidence: {fields: [azure_ad_admin_configured]}

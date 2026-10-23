@@ -2,7 +2,12 @@ import json
 from pathlib import Path
 from typing import Protocol
 
-from azure_compliance_guard.models import KeyVaultState, ResourceRef, StorageState
+from azure_compliance_guard.models import (
+    KeyVaultState,
+    ResourceRef,
+    SqlState,
+    StorageState,
+)
 
 MAX_FIXTURE_FILE_BYTES = 5 * 1_048_576
 
@@ -120,6 +125,70 @@ class FixtureKeyVaultCollector:
                     private_endpoint_enabled=private_endpoint_enabled,
                     keys_have_expiry=_all_have_expiry(item, "keys", label),
                     secrets_have_expiry=_all_have_expiry(item, "secrets", label),
+                )
+            )
+        return states
+
+
+class FixtureSqlCollector:
+    def __init__(self, path: str | Path):
+        self.path = Path(path)
+
+    def collect(self) -> list[SqlState]:
+        payload = _load_fixture(self.path)
+        resource_group = _required_string(payload, "resource_group", "fixture")
+        items = payload.get("sql_servers")
+        if not isinstance(items, list):
+            raise InvalidFixtureError("fixture.sql_servers must be a list")
+
+        states = []
+        for index, item in enumerate(items):
+            label = f"fixture.sql_servers[{index}]"
+            if not isinstance(item, dict):
+                raise InvalidFixtureError(f"{label} must be an object")
+            server = _required_mapping(item, "server", label)
+            auditing = _required_mapping(item, "auditing", label)
+            defender = _required_mapping(item, "defender", label)
+            min_tls_version = server.get("minimalTlsVersion")
+            public_network_access = server.get("publicNetworkAccess")
+            private_endpoint_enabled = item.get("private_endpoint_enabled", False)
+            ad_admins = item.get("ad_admins")
+            _optional_string(min_tls_version, f"{label}.server.minimalTlsVersion")
+            _optional_string(
+                public_network_access, f"{label}.server.publicNetworkAccess"
+            )
+            _required_bool(
+                private_endpoint_enabled, f"{label}.private_endpoint_enabled"
+            )
+            if not isinstance(ad_admins, list):
+                raise InvalidFixtureError(f"{label}.ad_admins must be a list")
+            item_resource_group = item.get("resource_group", resource_group)
+            if (
+                not isinstance(item_resource_group, str)
+                or not item_resource_group.strip()
+            ):
+                raise InvalidFixtureError(
+                    f"{label}.resource_group must be a non-empty string"
+                )
+            states.append(
+                SqlState(
+                    resource=ResourceRef(
+                        service="sql",
+                        resource_group=item_resource_group,
+                        name=_required_string(item, "name", label),
+                    ),
+                    auditing_enabled=(
+                        _required_string(auditing, "state", f"{label}.auditing")
+                        == "Enabled"
+                    ),
+                    defender_enabled=(
+                        _required_string(defender, "pricingTier", f"{label}.defender")
+                        == "Standard"
+                    ),
+                    min_tls_version=min_tls_version,
+                    public_network_access=public_network_access,
+                    private_endpoint_enabled=private_endpoint_enabled,
+                    azure_ad_admin_configured=bool(ad_admins),
                 )
             )
         return states

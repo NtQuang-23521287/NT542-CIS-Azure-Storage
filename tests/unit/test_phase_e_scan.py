@@ -7,6 +7,7 @@ import pytest
 from azure_compliance_guard.collectors import (
     AzureStorageCollector,
     FixtureKeyVaultCollector,
+    FixtureSqlCollector,
     FixtureStorageCollector,
     InvalidFixtureError,
 )
@@ -307,3 +308,96 @@ def test_key_vault_fixture_rejects_string_boolean(tmp_path):
 
     with pytest.raises(InvalidFixtureError, match="enableRbacAuthorization"):
         FixtureKeyVaultCollector(path).collect()
+
+
+def test_sql_fixture_normalizes_raw_properties(tmp_path):
+    fixture = {
+        "resource_group": "rg-demo",
+        "sql_servers": [
+            {
+                "name": "sql-demo",
+                "server": {
+                    "minimalTlsVersion": "1.2",
+                    "publicNetworkAccess": "Disabled",
+                },
+                "auditing": {"state": "Enabled"},
+                "defender": {"pricingTier": "Standard"},
+                "private_endpoint_enabled": True,
+                "ad_admins": [{"login": "admin-demo"}],
+            }
+        ],
+    }
+    path = tmp_path / "sql.json"
+    path.write_text(json.dumps(fixture), encoding="utf-8")
+
+    states = FixtureSqlCollector(path).collect()
+
+    assert states == [
+        SqlState(
+            resource=ResourceRef("sql", "rg-demo", "sql-demo"),
+            auditing_enabled=True,
+            defender_enabled=True,
+            min_tls_version="1.2",
+            public_network_access="Disabled",
+            private_endpoint_enabled=True,
+            azure_ad_admin_configured=True,
+        )
+    ]
+
+
+def test_sql_drift_produces_stable_default_rule_ids(tmp_path):
+    fixture = {
+        "resource_group": "rg-demo",
+        "sql_servers": [
+            {
+                "name": "sql-drift",
+                "server": {
+                    "minimalTlsVersion": "1.0",
+                    "publicNetworkAccess": "Enabled",
+                },
+                "auditing": {"state": "Disabled"},
+                "defender": {"pricingTier": "Free"},
+                "private_endpoint_enabled": False,
+                "ad_admins": [],
+            }
+        ],
+    }
+    path = tmp_path / "sql.json"
+    path.write_text(json.dumps(fixture), encoding="utf-8")
+
+    findings = evaluate_states(
+        FixtureSqlCollector(path).collect(), load_default_rule_catalog()
+    )
+
+    assert [finding.rule_id for finding in findings] == [
+        "ACG-SQL-001",
+        "ACG-SQL-002",
+        "ACG-SQL-003",
+        "ACG-SQL-004",
+        "ACG-SQL-005",
+        "ACG-SQL-006",
+    ]
+
+
+def test_sql_fixture_rejects_non_list_ad_admins(tmp_path):
+    fixture = {
+        "resource_group": "rg-demo",
+        "sql_servers": [
+            {
+                "name": "sql-invalid",
+                "server": {
+                    "minimalTlsVersion": "1.2",
+                    "publicNetworkAccess": "Disabled",
+                },
+                "auditing": {"state": "Enabled"},
+                "defender": {"pricingTier": "Standard"},
+                "private_endpoint_enabled": True,
+                "ad_admins": "configured",
+            }
+        ],
+    }
+    path = tmp_path / "sql.json"
+    path.write_text(json.dumps(fixture), encoding="utf-8")
+
+    with pytest.raises(InvalidFixtureError, match="ad_admins"):
+        FixtureSqlCollector(path).collect()

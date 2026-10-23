@@ -65,7 +65,7 @@ def load_rule_catalog(path: str | Path) -> RuleCatalog:
 def load_default_rule_catalog() -> RuleCatalog:
     packaged_rules = files("azure_compliance_guard").joinpath("rules")
     catalogs = []
-    for name in ("storage.yaml", "key_vault.yaml"):
+    for name in ("storage.yaml", "key_vault.yaml", "sql.yaml"):
         path = packaged_rules.joinpath(name)
         with path.open(encoding="utf-8") as file:
             try:

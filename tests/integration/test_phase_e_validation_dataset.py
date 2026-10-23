@@ -3,6 +3,7 @@ from pathlib import Path
 
 from azure_compliance_guard.collectors import (
     FixtureKeyVaultCollector,
+    FixtureSqlCollector,
     FixtureStorageCollector,
 )
 from azure_compliance_guard.rules import load_default_rule_catalog
@@ -21,6 +22,7 @@ def test_validation_cases_match_reviewed_ground_truth():
     collectors = {
         "storage": FixtureStorageCollector,
         "key_vault": FixtureKeyVaultCollector,
+        "sql": FixtureSqlCollector,
     }
     for case in manifest["cases"]:
         states = collectors[case["service"]](validation_dir / case["fixture"]).collect()
