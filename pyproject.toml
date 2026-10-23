@@ -1,6 +1,10 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "nt542-cis-azure-storage"
-version = "0.1.0"
+version = "0.2.0"
 description = "Educational Azure compliance and controlled-remediation lab"
 requires-python = ">=3.14,<3.15"
 dependencies = [
@@ -8,7 +12,11 @@ dependencies = [
     "azure-mgmt-resource>=25,<26",
     "azure-mgmt-storage>=25,<26",
     "python-dotenv>=1.2.2,<2",
+    "pyyaml>=6.0.3,<7",
 ]
+
+[project.scripts]
+acg = "azure_compliance_guard.cli:main"
 
 [project.optional-dependencies]
 dev = [
@@ -20,7 +28,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["Compliance/engine"]
+pythonpath = ["src", "Compliance/engine"]
 addopts = "-m 'not live'"
 markers = [
     "integration: offline tests crossing module or file boundaries",
@@ -32,3 +40,9 @@ target-version = "py314"
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+azure_compliance_guard = ["rules/*.yaml", "fixtures/*.json"]

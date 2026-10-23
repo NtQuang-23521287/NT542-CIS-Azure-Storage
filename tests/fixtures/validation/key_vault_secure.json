@@ -1,0 +1,21 @@
+{
+  "resource_group": "rg-validation",
+  "key_vaults": [
+    {
+      "name": "kv-secure",
+      "properties": {
+        "publicNetworkAccess": "Disabled",
+        "enableRbacAuthorization": true,
+        "enablePurgeProtection": true,
+        "enableSoftDelete": true
+      },
+      "private_endpoint_enabled": true,
+      "keys": [
+        {"attributes": {"expires": "2027-01-01T00:00:00Z"}}
+      ],
+      "secrets": [
+        {"attributes": {"expires": "2027-01-01T00:00:00Z"}}
+      ]
+    }
+  ]
+}

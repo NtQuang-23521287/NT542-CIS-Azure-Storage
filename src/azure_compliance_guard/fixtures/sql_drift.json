@@ -1,0 +1,16 @@
+{
+  "resource_group": "rg-validation",
+  "sql_servers": [
+    {
+      "name": "sql-drift",
+      "server": {
+        "minimalTlsVersion": "1.0",
+        "publicNetworkAccess": "Enabled"
+      },
+      "auditing": {"state": "Disabled"},
+      "defender": {"pricingTier": "Free"},
+      "private_endpoint_enabled": false,
+      "ad_admins": []
+    }
+  ]
+}

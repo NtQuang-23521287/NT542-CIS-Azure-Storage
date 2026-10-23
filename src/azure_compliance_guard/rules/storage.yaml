@@ -1,0 +1,77 @@
+schema_version: 1
+rules:
+  - id: ACG-STO-001
+    title: Require HTTPS traffic only
+    service: storage
+    severity: CRITICAL
+    framework:
+      name: CIS Microsoft Azure Storage Services Benchmark
+      version: 2.0.0
+      control: null
+    selector:
+      field: https_only
+    assertion:
+      operator: equals
+      expected: true
+    remediation:
+      handler: enable_https_only
+      default_mode: plan_only
+    evidence:
+      fields: [https_only]
+
+  - id: ACG-STO-002
+    title: Require minimum TLS 1.2
+    service: storage
+    severity: CRITICAL
+    framework:
+      name: CIS Microsoft Azure Storage Services Benchmark
+      version: 2.0.0
+      control: null
+    selector:
+      field: min_tls_version
+    assertion:
+      operator: equals
+      expected: TLS1_2
+    remediation:
+      handler: set_minimum_tls_1_2
+      default_mode: plan_only
+    evidence:
+      fields: [min_tls_version]
+
+  - id: ACG-STO-003
+    title: Disable public network access
+    service: storage
+    severity: CRITICAL
+    framework:
+      name: CIS Microsoft Azure Storage Services Benchmark
+      version: 2.0.0
+      control: null
+    selector:
+      field: public_network_access
+    assertion:
+      operator: equals
+      expected: Disabled
+    remediation:
+      handler: disable_public_network_access
+      default_mode: plan_only
+    evidence:
+      fields: [public_network_access]
+
+  - id: ACG-STO-004
+    title: Enable blob versioning
+    service: storage
+    severity: WARNING
+    framework:
+      name: CIS Microsoft Azure Storage Services Benchmark
+      version: 2.0.0
+      control: null
+    selector:
+      field: versioning_enabled
+    assertion:
+      operator: equals
+      expected: true
+    remediation:
+      handler: enable_blob_versioning
+      default_mode: plan_only
+    evidence:
+      fields: [versioning_enabled]

@@ -1,0 +1,71 @@
+schema_version: 1
+rules:
+  - id: ACG-KV-001
+    title: Disable Key Vault public network access
+    service: key_vault
+    severity: CRITICAL
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: public_network_access}
+    assertion: {operator: equals, expected: Disabled}
+    remediation: {handler: disable_key_vault_public_network_access, default_mode: plan_only}
+    evidence: {fields: [public_network_access]}
+
+  - id: ACG-KV-002
+    title: Enable Key Vault RBAC authorization
+    service: key_vault
+    severity: CRITICAL
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: rbac_authorization_enabled}
+    assertion: {operator: equals, expected: true}
+    remediation: {handler: enable_key_vault_rbac, default_mode: plan_only}
+    evidence: {fields: [rbac_authorization_enabled]}
+
+  - id: ACG-KV-003
+    title: Enable Key Vault purge protection
+    service: key_vault
+    severity: CRITICAL
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: purge_protection_enabled}
+    assertion: {operator: equals, expected: true}
+    remediation: {handler: enable_key_vault_purge_protection, default_mode: plan_only}
+    evidence: {fields: [purge_protection_enabled]}
+
+  - id: ACG-KV-004
+    title: Enable Key Vault soft delete
+    service: key_vault
+    severity: CRITICAL
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: soft_delete_enabled}
+    assertion: {operator: equals, expected: true}
+    remediation: {handler: enable_key_vault_soft_delete, default_mode: plan_only}
+    evidence: {fields: [soft_delete_enabled]}
+
+  - id: ACG-KV-005
+    title: Require a Key Vault private endpoint
+    service: key_vault
+    severity: CRITICAL
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: private_endpoint_enabled}
+    assertion: {operator: equals, expected: true}
+    remediation: {handler: configure_key_vault_private_endpoint, default_mode: manual_only}
+    evidence: {fields: [private_endpoint_enabled]}
+
+  - id: ACG-KV-006
+    title: Require expiry dates on Key Vault keys
+    service: key_vault
+    severity: WARNING
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: keys_have_expiry}
+    assertion: {operator: equals, expected: true}
+    remediation: {handler: set_key_expiry, default_mode: manual_only}
+    evidence: {fields: [keys_have_expiry]}
+
+  - id: ACG-KV-007
+    title: Require expiry dates on Key Vault secrets
+    service: key_vault
+    severity: WARNING
+    framework: {name: Azure Compliance Guard internal baseline, version: "1", control: null}
+    selector: {field: secrets_have_expiry}
+    assertion: {operator: equals, expected: true}
+    remediation: {handler: set_secret_expiry, default_mode: manual_only}
+    evidence: {fields: [secrets_have_expiry]}

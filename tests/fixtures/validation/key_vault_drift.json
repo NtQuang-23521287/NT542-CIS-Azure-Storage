@@ -1,0 +1,21 @@
+{
+  "resource_group": "rg-validation",
+  "key_vaults": [
+    {
+      "name": "kv-drift",
+      "properties": {
+        "publicNetworkAccess": "Enabled",
+        "enableRbacAuthorization": false,
+        "enablePurgeProtection": false,
+        "enableSoftDelete": false
+      },
+      "private_endpoint_enabled": false,
+      "keys": [
+        {"attributes": {"expires": null}}
+      ],
+      "secrets": [
+        {"attributes": {}}
+      ]
+    }
+  ]
+}

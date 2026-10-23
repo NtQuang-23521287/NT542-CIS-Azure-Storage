@@ -1,0 +1,16 @@
+{
+  "resource_group": "rg-acg-validation",
+  "storage_accounts": [
+    {
+      "name": "stsecurecase",
+      "account": {
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2",
+        "publicNetworkAccess": "Disabled"
+      },
+      "blob_service": {
+        "isVersioningEnabled": true
+      }
+    }
+  ]
+}
