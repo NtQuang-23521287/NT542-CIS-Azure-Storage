@@ -9,7 +9,7 @@ description = "Educational Azure compliance and controlled-remediation lab"
 requires-python = ">=3.14,<3.15"
 dependencies = [
     "azure-identity>=1.25.3,<2",
-    "azure-mgmt-resource>=25,<26",
+    "azure-mgmt-resource>=25,<27",
     "azure-mgmt-storage>=25,<26",
     "python-dotenv>=1.2.2,<2",
     "pyyaml>=6.0.3,<7",
