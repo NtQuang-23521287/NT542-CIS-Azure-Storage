@@ -2,6 +2,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from importlib.resources import as_file, files
 from pathlib import Path
 
@@ -28,6 +29,31 @@ EXIT_OPERATIONAL_ERROR = 2
 EXIT_CONFIGURATION_ERROR = 3
 
 
+def _positive_float(value: str) -> float:
+    parsed = float(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+    return parsed
+
+
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be greater than zero")
+    return parsed
+
+
+def _add_scan_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--source", choices=("azure", "fixture"), default="azure")
+    parser.add_argument(
+        "--service",
+        choices=("storage", "key-vault", "sql", "all"),
+        default="storage",
+    )
+    parser.add_argument("--fixture", type=Path)
+    parser.add_argument("--rules", type=Path)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="acg", description="Azure Compliance Guard")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -36,15 +62,14 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--format", choices=("text", "json"), default="text")
 
     scan = subparsers.add_parser("scan", help="run one compliance scan and exit")
-    scan.add_argument("--source", choices=("azure", "fixture"), default="azure")
-    scan.add_argument(
-        "--service",
-        choices=("storage", "key-vault", "sql", "all"),
-        default="storage",
-    )
-    scan.add_argument("--fixture", type=Path)
-    scan.add_argument("--rules", type=Path)
+    _add_scan_arguments(scan)
     scan.add_argument("--format", choices=("text", "json"), default="text")
+
+    watch = subparsers.add_parser("watch", help="run compliance scans repeatedly")
+    _add_scan_arguments(watch)
+    watch.add_argument("--format", choices=("text", "jsonl"), default="text")
+    watch.add_argument("--interval", type=_positive_float, default=60.0)
+    watch.add_argument("--iterations", type=_positive_int)
     return parser
 
 
@@ -167,7 +192,7 @@ def _azure_states(service: str):
     ).collect()
 
 
-def _run_scan(args: argparse.Namespace) -> int:
+def _collect_scan(args: argparse.Namespace):
     catalog = (
         load_rule_catalog(args.rules) if args.rules else load_default_rule_catalog()
     )
@@ -176,27 +201,55 @@ def _run_scan(args: argparse.Namespace) -> int:
     else:
         states = _azure_states(args.service)
     findings = evaluate_states(states, catalog)
-    if args.format == "json":
+    return states, findings
+
+
+def _scan_document(states, findings, *, cycle: int | None = None) -> dict:
+    document = {
+        "summary": {
+            "resources": len(states),
+            "findings": len(findings),
+        },
+        "findings": [finding.to_dict() for finding in findings],
+    }
+    if cycle is not None:
+        document["cycle"] = cycle
+    return document
+
+
+def _emit_text(states, findings) -> None:
+    print(f"Scanned {len(states)} resource(s); {len(findings)} finding(s).")
+    for finding in findings:
         print(
-            json.dumps(
-                {
-                    "summary": {
-                        "resources": len(states),
-                        "findings": len(findings),
-                    },
-                    "findings": [finding.to_dict() for finding in findings],
-                },
-                indent=2,
-            )
+            f"[{finding.severity}] {finding.rule_id} "
+            f"{finding.resource.name}: {finding.title}"
         )
+
+
+def _run_scan(args: argparse.Namespace) -> int:
+    states, findings = _collect_scan(args)
+    if args.format == "json":
+        print(json.dumps(_scan_document(states, findings), indent=2))
     else:
-        print(f"Scanned {len(states)} resource(s); {len(findings)} finding(s).")
-        for finding in findings:
-            print(
-                f"[{finding.severity}] {finding.rule_id} "
-                f"{finding.resource.name}: {finding.title}"
-            )
+        _emit_text(states, findings)
     return EXIT_FINDINGS if findings else EXIT_OK
+
+
+def _run_watch(args: argparse.Namespace) -> int:
+    cycle = 1
+    had_findings = False
+    while True:
+        states, findings = _collect_scan(args)
+        had_findings = had_findings or bool(findings)
+        if args.format == "jsonl":
+            print(json.dumps(_scan_document(states, findings, cycle=cycle)))
+        else:
+            _emit_text(states, findings)
+
+        if args.iterations is not None and cycle >= args.iterations:
+            return EXIT_FINDINGS if had_findings else EXIT_OK
+        time.sleep(args.interval)
+        cycle += 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -204,6 +257,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "doctor":
             return _run_doctor(args.format)
+        if args.command == "watch":
+            return _run_watch(args)
         return _run_scan(args)
     except InvalidRuleSetError as exc:
         print(f"Invalid rule set or configuration: {exc}", file=sys.stderr)

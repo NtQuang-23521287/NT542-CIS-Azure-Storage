@@ -1,6 +1,8 @@
 import json
 from unittest.mock import Mock
 
+import pytest
+
 from azure_compliance_guard import cli
 from azure_compliance_guard.cli import main
 from azure_compliance_guard.models import KeyVaultState, ResourceRef, SqlState
@@ -220,3 +222,56 @@ def test_invalid_rule_set_has_configuration_exit_code(capsys, tmp_path):
 
     assert exit_code == 3
     assert "Invalid rule set" in capsys.readouterr().err
+
+
+def test_watch_runs_bounded_cycles_without_changing_scan_semantics(capsys, monkeypatch):
+    sleep = Mock()
+    monkeypatch.setattr(cli.time, "sleep", sleep)
+
+    exit_code = main(
+        [
+            "watch",
+            "--source",
+            "fixture",
+            "--service",
+            "storage",
+            "--interval",
+            "15",
+            "--iterations",
+            "2",
+        ]
+    )
+
+    assert exit_code == 1
+    assert capsys.readouterr().out.count("Scanned 1 resource(s); 4 finding(s).") == 2
+    sleep.assert_called_once_with(15.0)
+
+
+def test_watch_jsonl_emits_one_document_per_cycle(capsys, monkeypatch):
+    monkeypatch.setattr(cli.time, "sleep", lambda _: None)
+
+    exit_code = main(
+        [
+            "watch",
+            "--source",
+            "fixture",
+            "--service",
+            "sql",
+            "--format",
+            "jsonl",
+            "--iterations",
+            "2",
+        ]
+    )
+
+    documents = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
+    assert exit_code == 1
+    assert [item["cycle"] for item in documents] == [1, 2]
+    assert all(item["summary"] == {"resources": 1, "findings": 6} for item in documents)
+
+
+def test_watch_rejects_non_positive_interval():
+    with pytest.raises(SystemExit) as error:
+        main(["watch", "--interval", "0"])
+
+    assert error.value.code == 2
