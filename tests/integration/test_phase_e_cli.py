@@ -1,0 +1,77 @@
+import json
+
+from azure_compliance_guard.cli import main
+
+
+def test_doctor_reports_missing_offline_prerequisites_without_mutating(
+    capsys, monkeypatch
+):
+    monkeypatch.setenv("PATH", "")
+    monkeypatch.delenv("AZURE_SUBSCRIPTION_ID", raising=False)
+    monkeypatch.delenv("ALLOW_AZURE_MUTATIONS", raising=False)
+
+    exit_code = main(["doctor", "--format", "json"])
+
+    output = json.loads(capsys.readouterr().out)
+    assert exit_code == 2
+    checks = {item["name"]: item for item in output["checks"]}
+    assert checks["azure_cli"]["status"] == "FAIL"
+    assert checks["subscription"]["status"] == "FAIL"
+    assert checks["azure_mutations"]["status"] == "PASS"
+
+
+def test_doctor_does_not_echo_subscription_id(capsys, monkeypatch):
+    monkeypatch.setenv("AZURE_SUBSCRIPTION_ID", "00000000-secret-subscription")
+    monkeypatch.setattr(
+        "azure_compliance_guard.doctor.shutil.which",
+        lambda command, path=None: f"C:/tools/{command}.exe",
+    )
+
+    def fake_command(executable, args):
+        detail = (
+            "00000000-secret-subscription"
+            if args[:2] == ["account", "show"]
+            else "Terraform v1.14.9"
+        )
+        return True, detail
+
+    monkeypatch.setattr("azure_compliance_guard.doctor._run_version", fake_command)
+
+    main(["doctor", "--format", "json"])
+
+    assert "00000000-secret-subscription" not in capsys.readouterr().out
+
+
+def test_fixture_scan_is_one_shot_and_returns_policy_exit_code(capsys):
+    exit_code = main(["scan", "--source", "fixture", "--format", "json"])
+
+    output = json.loads(capsys.readouterr().out)
+    assert exit_code == 1
+    assert output["summary"] == {"resources": 1, "findings": 4}
+    assert [item["rule_id"] for item in output["findings"]] == [
+        "ACG-STO-001",
+        "ACG-STO-002",
+        "ACG-STO-003",
+        "ACG-STO-004",
+    ]
+
+
+def test_missing_fixture_is_an_operational_failure(capsys, tmp_path):
+    missing = tmp_path / "missing.json"
+
+    exit_code = main(["scan", "--source", "fixture", "--fixture", str(missing)])
+
+    assert exit_code == 2
+    assert "missing.json" in capsys.readouterr().err
+
+
+def test_invalid_rule_set_has_configuration_exit_code(capsys, tmp_path):
+    rules = tmp_path / "invalid.yaml"
+    rules.write_text("schema_version: [", encoding="utf-8")
+
+    exit_code = main(
+        ["scan", "--source", "fixture", "--rules", str(rules), "--format", "json"]
+    )
+
+    assert exit_code == 3
+    assert "Invalid rule set" in capsys.readouterr().err

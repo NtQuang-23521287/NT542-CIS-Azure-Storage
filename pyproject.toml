@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nt542-cis-azure-storage"
-version = "0.1.0"
+version = "0.2.0"
 description = "Educational Azure compliance and controlled-remediation lab"
 requires-python = ">=3.14,<3.15"
 dependencies = [
@@ -14,6 +14,9 @@ dependencies = [
     "python-dotenv>=1.2.2,<2",
     "pyyaml>=6.0.3,<7",
 ]
+
+[project.scripts]
+acg = "azure_compliance_guard.cli:main"
 
 [project.optional-dependencies]
 dev = [
