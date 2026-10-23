@@ -63,12 +63,20 @@ def load_rule_catalog(path: str | Path) -> RuleCatalog:
 
 
 def load_default_rule_catalog() -> RuleCatalog:
-    path = files("azure_compliance_guard").joinpath("rules/storage.yaml")
-    with path.open(encoding="utf-8") as file:
-        try:
-            return _parse_catalog(yaml.safe_load(file))
-        except yaml.YAMLError as exc:
-            raise InvalidRuleSetError(f"invalid YAML in packaged rules: {exc}") from exc
+    packaged_rules = files("azure_compliance_guard").joinpath("rules")
+    catalogs = []
+    for name in ("storage.yaml", "key_vault.yaml"):
+        path = packaged_rules.joinpath(name)
+        with path.open(encoding="utf-8") as file:
+            try:
+                catalogs.append(_parse_catalog(yaml.safe_load(file)))
+            except yaml.YAMLError as exc:
+                raise InvalidRuleSetError(
+                    f"invalid YAML in packaged rule {name}: {exc}"
+                ) from exc
+    rules = tuple(rule for catalog in catalogs for rule in catalog.rules)
+    _reject_duplicate_rule_ids(rules)
+    return RuleCatalog(schema_version=1, rules=rules)
 
 
 ALLOWED_OPERATORS = {"equals"}
@@ -167,6 +175,11 @@ def _parse_catalog(payload: Any) -> RuleCatalog:
         raise InvalidRuleSetError("catalog.rules must be a non-empty list")
 
     rules = tuple(_parse_rule(item, index) for index, item in enumerate(raw_rules))
+    _reject_duplicate_rule_ids(rules)
+    return RuleCatalog(schema_version=schema_version, rules=rules)
+
+
+def _reject_duplicate_rule_ids(rules: tuple[Rule, ...]) -> None:
     identifiers = set()
     duplicates = set()
     for rule in rules:
@@ -175,7 +188,6 @@ def _parse_catalog(payload: Any) -> RuleCatalog:
         identifiers.add(rule.id)
     if duplicates:
         raise InvalidRuleSetError(f"duplicate rule ID: {', '.join(sorted(duplicates))}")
-    return RuleCatalog(schema_version=schema_version, rules=rules)
 
 
 def _parse_rule(value: Any, index: int) -> Rule:

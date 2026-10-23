@@ -6,6 +6,7 @@ import pytest
 
 from azure_compliance_guard.collectors import (
     AzureStorageCollector,
+    FixtureKeyVaultCollector,
     FixtureStorageCollector,
     InvalidFixtureError,
 )
@@ -208,3 +209,101 @@ def test_sql_state_exposes_typed_rule_facts():
     )
 
     assert state.facts()["defender_enabled"] is False
+
+
+def test_key_vault_fixture_normalizes_raw_properties(tmp_path):
+    fixture = {
+        "resource_group": "rg-demo",
+        "key_vaults": [
+            {
+                "name": "kv-demo",
+                "properties": {
+                    "publicNetworkAccess": "Disabled",
+                    "enableRbacAuthorization": True,
+                    "enablePurgeProtection": True,
+                    "enableSoftDelete": True,
+                },
+                "private_endpoint_enabled": True,
+                "keys": [{"attributes": {"expires": "2027-01-01T00:00:00Z"}}],
+                "secrets": [{"attributes": {"expires": "2027-01-01T00:00:00Z"}}],
+            }
+        ],
+    }
+    path = tmp_path / "key-vault.json"
+    path.write_text(json.dumps(fixture), encoding="utf-8")
+
+    states = FixtureKeyVaultCollector(path).collect()
+
+    assert states == [
+        KeyVaultState(
+            resource=ResourceRef("key_vault", "rg-demo", "kv-demo"),
+            public_network_access="Disabled",
+            rbac_authorization_enabled=True,
+            purge_protection_enabled=True,
+            soft_delete_enabled=True,
+            private_endpoint_enabled=True,
+            keys_have_expiry=True,
+            secrets_have_expiry=True,
+        )
+    ]
+
+
+def test_key_vault_drift_produces_stable_default_rule_ids(tmp_path):
+    fixture = {
+        "resource_group": "rg-demo",
+        "key_vaults": [
+            {
+                "name": "kv-drift",
+                "properties": {
+                    "publicNetworkAccess": "Enabled",
+                    "enableRbacAuthorization": False,
+                    "enablePurgeProtection": False,
+                    "enableSoftDelete": False,
+                },
+                "private_endpoint_enabled": False,
+                "keys": [{"attributes": {"expires": None}}],
+                "secrets": [{"attributes": {}}],
+            }
+        ],
+    }
+    path = tmp_path / "key-vault.json"
+    path.write_text(json.dumps(fixture), encoding="utf-8")
+
+    findings = evaluate_states(
+        FixtureKeyVaultCollector(path).collect(), load_default_rule_catalog()
+    )
+
+    assert [finding.rule_id for finding in findings] == [
+        "ACG-KV-001",
+        "ACG-KV-002",
+        "ACG-KV-003",
+        "ACG-KV-004",
+        "ACG-KV-005",
+        "ACG-KV-006",
+        "ACG-KV-007",
+    ]
+
+
+def test_key_vault_fixture_rejects_string_boolean(tmp_path):
+    fixture = {
+        "resource_group": "rg-demo",
+        "key_vaults": [
+            {
+                "name": "kv-invalid",
+                "properties": {
+                    "publicNetworkAccess": "Disabled",
+                    "enableRbacAuthorization": "yes",
+                    "enablePurgeProtection": True,
+                    "enableSoftDelete": True,
+                },
+                "private_endpoint_enabled": True,
+                "keys": [],
+                "secrets": [],
+            }
+        ],
+    }
+    path = tmp_path / "key-vault.json"
+    path.write_text(json.dumps(fixture), encoding="utf-8")
+
+    with pytest.raises(InvalidFixtureError, match="enableRbacAuthorization"):
+        FixtureKeyVaultCollector(path).collect()

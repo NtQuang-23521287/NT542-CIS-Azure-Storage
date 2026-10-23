@@ -4,6 +4,7 @@
   "cases": [
     {
       "id": "ACG-VAL-STO-SECURE-001",
+      "service": "storage",
       "fixture": "storage_secure.json",
       "expected_result": "PASS",
       "expected_finding_ids": [],
@@ -11,6 +12,7 @@
     },
     {
       "id": "ACG-VAL-STO-DRIFT-001",
+      "service": "storage",
       "fixture": "storage_drift.json",
       "expected_result": "FAIL",
       "expected_finding_ids": [
@@ -18,6 +20,30 @@
         "ACG-STO-002",
         "ACG-STO-003",
         "ACG-STO-004"
+      ],
+      "cleanup": "Not applicable; sanitized offline fixture"
+    },
+    {
+      "id": "ACG-VAL-KV-SECURE-001",
+      "service": "key_vault",
+      "fixture": "key_vault_secure.json",
+      "expected_result": "PASS",
+      "expected_finding_ids": [],
+      "cleanup": "Not applicable; sanitized offline fixture"
+    },
+    {
+      "id": "ACG-VAL-KV-DRIFT-001",
+      "service": "key_vault",
+      "fixture": "key_vault_drift.json",
+      "expected_result": "FAIL",
+      "expected_finding_ids": [
+        "ACG-KV-001",
+        "ACG-KV-002",
+        "ACG-KV-003",
+        "ACG-KV-004",
+        "ACG-KV-005",
+        "ACG-KV-006",
+        "ACG-KV-007"
       ],
       "cleanup": "Not applicable; sanitized offline fixture"
     }
