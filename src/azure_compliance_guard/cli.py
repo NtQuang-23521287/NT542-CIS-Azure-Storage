@@ -17,6 +17,16 @@ from azure_compliance_guard.collectors import (
     FixtureStorageCollector,
 )
 from azure_compliance_guard.doctor import collect_doctor_checks
+from azure_compliance_guard.remediation import (
+    AzureExecutor,
+    InvalidPlanError,
+    apply_plan,
+    approve_plan,
+    create_plan,
+    has_active_exception_file,
+    read_approval,
+    read_plan,
+)
 from azure_compliance_guard.rules import (
     InvalidRuleSetError,
     load_default_rule_catalog,
@@ -71,6 +81,35 @@ def build_parser() -> argparse.ArgumentParser:
     watch.add_argument("--format", choices=("text", "jsonl"), default="text")
     watch.add_argument("--interval", type=_positive_float, default=60.0)
     watch.add_argument("--iterations", type=_positive_int)
+
+    remediation = subparsers.add_parser(
+        "remediation", help="plan and control remediation"
+    )
+    remediation_commands = remediation.add_subparsers(
+        dest="remediation_command", required=True
+    )
+    plan = remediation_commands.add_parser(
+        "plan", help="create a JSON plan without mutation"
+    )
+    _add_scan_arguments(plan)
+    plan.add_argument("--finding", required=True, help="finding ID or unique rule ID")
+    plan.add_argument("--resource", help="resource name if the finding is ambiguous")
+    plan.add_argument("--output", type=Path, help="create a new plan file")
+
+    approve = remediation_commands.add_parser("approve", help="approve one exact plan")
+    approve.add_argument("--plan", required=True, type=Path)
+    approve.add_argument("--approver", required=True)
+    approve.add_argument("--confirm-hash", required=True)
+    approve.add_argument("--output", type=Path, help="create a new approval file")
+
+    apply = remediation_commands.add_parser("apply", help="dry-run or execute one plan")
+    apply.add_argument("--plan", required=True, type=Path)
+    apply.add_argument("--approval", type=Path)
+    apply.add_argument("--exceptions", type=Path, help="reviewed local exception store")
+    apply.add_argument("--rules", type=Path)
+    mode = apply.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--dry-run", action="store_true")
+    mode.add_argument("--execute", action="store_true")
     return parser
 
 
@@ -253,6 +292,134 @@ def _run_watch(args: argparse.Namespace) -> int:
         cycle += 1
 
 
+def _read_artifact(path: Path) -> object:
+    if path.stat().st_size > 1_048_576:
+        raise InvalidPlanError("artifact exceeds 1 MiB")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _emit_artifact(document: dict, output: Path | None) -> None:
+    encoded = json.dumps(document, indent=2) + "\n"
+    if output is None:
+        print(encoded, end="")
+    else:
+        with output.open("x", encoding="utf-8") as artifact:
+            artifact.write(encoded)
+        print(f"Created {output}")
+
+
+def _run_remediation_plan(args: argparse.Namespace) -> int:
+    states, findings = _collect_scan(args)
+    matches = [
+        finding
+        for finding in findings
+        if args.finding in {finding.finding_id, finding.rule_id}
+        and (args.resource is None or finding.resource.name == args.resource)
+    ]
+    if len(matches) != 1:
+        raise InvalidPlanError("--finding must identify exactly one current finding")
+    finding = matches[0]
+    state = next(state for state in states if state.resource == finding.resource)
+    catalog = (
+        load_rule_catalog(args.rules) if args.rules else load_default_rule_catalog()
+    )
+    rule = next(rule for rule in catalog.rules if rule.id == finding.rule_id)
+    plan = create_plan(finding, state, rule, source=args.source)
+    _emit_artifact(plan.to_dict(), args.output)
+    return EXIT_OK
+
+
+def _run_remediation_approve(args: argparse.Namespace) -> int:
+    plan = read_plan(_read_artifact(args.plan))
+    if args.confirm_hash != plan.plan_hash:
+        raise InvalidPlanError("confirmed hash does not match the plan")
+    approval = approve_plan(plan, args.approver)
+    _emit_artifact(approval.to_dict(), args.output)
+    return EXIT_OK
+
+
+def _run_remediation_apply(args: argparse.Namespace) -> int:
+    plan = read_plan(_read_artifact(args.plan))
+    catalog = (
+        load_rule_catalog(args.rules) if args.rules else load_default_rule_catalog()
+    )
+    if args.dry_run:
+        result = apply_plan(
+            plan,
+            approval=None,
+            catalog=catalog,
+            collect=lambda: None,
+            execute=lambda _plan: False,
+            has_active_exception=lambda _plan: False,
+            dry_run=True,
+        )
+    else:
+        if plan.source != "azure":
+            raise InvalidPlanError("execution requires a live Azure plan")
+        if os.getenv("ALLOW_AZURE_MUTATIONS", "").strip().lower() != "true":
+            raise InvalidPlanError(
+                "ALLOW_AZURE_MUTATIONS=true is required for execution"
+            )
+        if args.approval is None:
+            raise InvalidPlanError("--approval is required for execution")
+        if args.exceptions is None:
+            raise InvalidPlanError("--exceptions is required for execution")
+        if plan.resource.get("subscription_id") != os.getenv("AZURE_SUBSCRIPTION_ID"):
+            raise InvalidPlanError(
+                "plan subscription does not match current configuration"
+            )
+        approval = read_approval(_read_artifact(args.approval))
+        service = {"storage": "storage", "key_vault": "key-vault", "sql": "sql"}[
+            plan.resource["service"]
+        ]
+
+        def collect():
+            states = _azure_states(service)
+            if len(states) != 1:
+                raise RuntimeError("expected exactly one Azure resource")
+            return states[0]
+
+        if service == "storage":
+            required = _required_environment(
+                (
+                    "AZURE_TENANT_ID",
+                    "AZURE_CLIENT_ID",
+                    "AZURE_CLIENT_SECRET",
+                )
+            )
+            from azure.identity import ClientSecretCredential
+            from azure.mgmt.storage import StorageManagementClient
+
+            credential = ClientSecretCredential(
+                tenant_id=required["AZURE_TENANT_ID"],
+                client_id=required["AZURE_CLIENT_ID"],
+                client_secret=required["AZURE_CLIENT_SECRET"],
+            )
+            executor = AzureExecutor(
+                storage_client=StorageManagementClient(
+                    credential, plan.resource["subscription_id"]
+                )
+            )
+        else:
+            executor = AzureExecutor(
+                cli_runner=AzureCliJsonRunner(plan.resource["subscription_id"])
+            )
+        result = apply_plan(
+            plan,
+            approval=approval,
+            catalog=catalog,
+            collect=collect,
+            execute=executor.execute,
+            has_active_exception=lambda current: has_active_exception_file(
+                current, args.exceptions
+            ),
+        )
+    print(json.dumps(result.to_dict()))
+    return (
+        EXIT_OK if result.status in {"DRY_RUN", "VERIFIED"} else EXIT_OPERATIONAL_ERROR
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -260,8 +427,14 @@ def main(argv: list[str] | None = None) -> int:
             return _run_doctor(args.format)
         if args.command == "watch":
             return _run_watch(args)
+        if args.command == "remediation":
+            if args.remediation_command == "plan":
+                return _run_remediation_plan(args)
+            if args.remediation_command == "approve":
+                return _run_remediation_approve(args)
+            return _run_remediation_apply(args)
         return _run_scan(args)
-    except InvalidRuleSetError as exc:
+    except (InvalidRuleSetError, InvalidPlanError) as exc:
         print(f"Invalid rule set or configuration: {exc}", file=sys.stderr)
         return EXIT_CONFIGURATION_ERROR
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
