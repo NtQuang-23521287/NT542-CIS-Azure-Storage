@@ -1,6 +1,9 @@
 import json
+from unittest.mock import Mock
 
+from azure_compliance_guard import cli
 from azure_compliance_guard.cli import main
+from azure_compliance_guard.models import KeyVaultState, ResourceRef, SqlState
 
 
 def test_doctor_reports_missing_offline_prerequisites_without_mutating(
@@ -121,11 +124,81 @@ def test_fixture_scan_can_evaluate_all_services(capsys):
     }
 
 
-def test_azure_scan_rejects_service_without_live_adapter(capsys):
-    exit_code = main(["scan", "--source", "azure", "--service", "sql"])
+def test_azure_scan_uses_key_vault_read_only_adapter(capsys, monkeypatch):
+    monkeypatch.setenv("AZURE_SUBSCRIPTION_ID", "00000000-0000-0000-0000-000000000001")
+    monkeypatch.setenv("RESOURCE_GROUP", "rg-demo")
+    monkeypatch.setenv("KEY_VAULT_NAME", "kv-demo")
+    runner = object()
+    monkeypatch.setattr(cli, "AzureCliJsonRunner", lambda subscription_id: runner)
+    collector = Mock()
+    collector.collect.return_value = [
+        KeyVaultState(
+            resource=ResourceRef("key_vault", "rg-demo", "kv-demo"),
+            public_network_access="Disabled",
+            rbac_authorization_enabled=True,
+            purge_protection_enabled=True,
+            soft_delete_enabled=True,
+            private_endpoint_enabled=True,
+            keys_have_expiry=True,
+            secrets_have_expiry=True,
+        )
+    ]
+    constructor = Mock(return_value=collector)
+    monkeypatch.setattr(cli, "AzureKeyVaultCollector", constructor)
 
-    assert exit_code == 3
-    assert "supports --service storage only" in capsys.readouterr().err
+    exit_code = main(
+        ["scan", "--source", "azure", "--service", "key-vault", "--format", "json"]
+    )
+
+    assert exit_code == 0
+    assert json.loads(capsys.readouterr().out)["summary"] == {
+        "resources": 1,
+        "findings": 0,
+    }
+    constructor.assert_called_once_with(
+        runner,
+        "rg-demo",
+        "kv-demo",
+        "00000000-0000-0000-0000-000000000001",
+    )
+
+
+def test_azure_scan_uses_sql_read_only_adapter(capsys, monkeypatch):
+    monkeypatch.setenv("AZURE_SUBSCRIPTION_ID", "00000000-0000-0000-0000-000000000001")
+    monkeypatch.setenv("RESOURCE_GROUP", "rg-demo")
+    monkeypatch.setenv("SQL_SERVER_NAME", "sql-demo")
+    runner = object()
+    monkeypatch.setattr(cli, "AzureCliJsonRunner", lambda subscription_id: runner)
+    collector = Mock()
+    collector.collect.return_value = [
+        SqlState(
+            resource=ResourceRef("sql", "rg-demo", "sql-demo"),
+            auditing_enabled=True,
+            defender_enabled=True,
+            min_tls_version="1.2",
+            public_network_access="Disabled",
+            private_endpoint_enabled=True,
+            azure_ad_admin_configured=True,
+        )
+    ]
+    constructor = Mock(return_value=collector)
+    monkeypatch.setattr(cli, "AzureSqlCollector", constructor)
+
+    exit_code = main(
+        ["scan", "--source", "azure", "--service", "sql", "--format", "json"]
+    )
+
+    assert exit_code == 0
+    assert json.loads(capsys.readouterr().out)["summary"] == {
+        "resources": 1,
+        "findings": 0,
+    }
+    constructor.assert_called_once_with(
+        runner,
+        "rg-demo",
+        "sql-demo",
+        "00000000-0000-0000-0000-000000000001",
+    )
 
 
 def test_missing_fixture_is_an_operational_failure(capsys, tmp_path):

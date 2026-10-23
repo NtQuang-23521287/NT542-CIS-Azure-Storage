@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Protocol
 
@@ -14,6 +15,10 @@ MAX_FIXTURE_FILE_BYTES = 5 * 1_048_576
 
 class InvalidFixtureError(ValueError):
     """A fixture does not match the normalized Storage input contract."""
+
+
+class InvalidCollectorResponseError(RuntimeError):
+    """A live collector received an unexpected Azure response shape."""
 
 
 class StorageCollector(Protocol):
@@ -228,6 +233,171 @@ class AzureStorageCollector:
         ]
 
 
+class JsonCommandRunner(Protocol):
+    def run(self, args: list[str]): ...
+
+
+class AzureKeyVaultCollector:
+    def __init__(
+        self,
+        runner: JsonCommandRunner,
+        resource_group: str,
+        key_vault_name: str,
+        subscription_id: str,
+    ):
+        self.runner = runner
+        self.resource = ResourceRef(
+            "key_vault", resource_group, key_vault_name, subscription_id
+        )
+
+    def collect(self) -> list[KeyVaultState]:
+        vault = _live_mapping(
+            self.runner.run(
+                [
+                    "keyvault",
+                    "show",
+                    "--resource-group",
+                    self.resource.resource_group,
+                    "--name",
+                    self.resource.name,
+                ]
+            ),
+            "key vault",
+        )
+        properties = _live_mapping(vault.get("properties"), "key vault properties")
+        keys = _live_list(
+            self.runner.run(
+                ["keyvault", "key", "list", "--vault-name", self.resource.name]
+            ),
+            "key list",
+        )
+        secrets = _live_list(
+            self.runner.run(
+                ["keyvault", "secret", "list", "--vault-name", self.resource.name]
+            ),
+            "secret list",
+        )
+        private_endpoints = _live_list(
+            self.runner.run(
+                [
+                    "network",
+                    "private-endpoint",
+                    "list",
+                    "--resource-group",
+                    self.resource.resource_group,
+                ]
+            ),
+            "private endpoint list",
+        )
+        return [
+            KeyVaultState(
+                resource=self.resource,
+                public_network_access=properties.get("publicNetworkAccess"),
+                rbac_authorization_enabled=properties.get("enableRbacAuthorization"),
+                purge_protection_enabled=properties.get("enablePurgeProtection"),
+                soft_delete_enabled=properties.get("enableSoftDelete"),
+                private_endpoint_enabled=_has_approved_private_endpoint(
+                    private_endpoints,
+                    "Microsoft.KeyVault/vaults",
+                    self.resource.name,
+                ),
+                keys_have_expiry=_live_items_have_expiry(keys, "key list"),
+                secrets_have_expiry=_live_items_have_expiry(secrets, "secret list"),
+            )
+        ]
+
+
+class AzureSqlCollector:
+    def __init__(
+        self,
+        runner: JsonCommandRunner,
+        resource_group: str,
+        sql_server_name: str,
+        subscription_id: str,
+    ):
+        self.runner = runner
+        self.resource = ResourceRef(
+            "sql", resource_group, sql_server_name, subscription_id
+        )
+
+    def collect(self) -> list[SqlState]:
+        server = _live_mapping(
+            self.runner.run(
+                [
+                    "sql",
+                    "server",
+                    "show",
+                    "--resource-group",
+                    self.resource.resource_group,
+                    "--name",
+                    self.resource.name,
+                ]
+            ),
+            "SQL server",
+        )
+        auditing = _live_mapping(
+            self.runner.run(
+                [
+                    "sql",
+                    "server",
+                    "audit-policy",
+                    "show",
+                    "--resource-group",
+                    self.resource.resource_group,
+                    "--name",
+                    self.resource.name,
+                ]
+            ),
+            "SQL audit policy",
+        )
+        ad_admins = _live_list(
+            self.runner.run(
+                [
+                    "sql",
+                    "server",
+                    "ad-admin",
+                    "list",
+                    "--resource-group",
+                    self.resource.resource_group,
+                    "--server",
+                    self.resource.name,
+                ]
+            ),
+            "SQL AD administrator list",
+        )
+        defender = _live_mapping(
+            self.runner.run(["security", "pricing", "show", "--name", "SqlServers"]),
+            "Defender pricing",
+        )
+        private_endpoints = _live_list(
+            self.runner.run(
+                [
+                    "network",
+                    "private-endpoint",
+                    "list",
+                    "--resource-group",
+                    self.resource.resource_group,
+                ]
+            ),
+            "private endpoint list",
+        )
+        return [
+            SqlState(
+                resource=self.resource,
+                auditing_enabled=auditing.get("state") == "Enabled",
+                defender_enabled=defender.get("pricingTier") == "Standard",
+                min_tls_version=server.get("minimalTlsVersion"),
+                public_network_access=server.get("publicNetworkAccess"),
+                private_endpoint_enabled=_has_approved_private_endpoint(
+                    private_endpoints,
+                    "Microsoft.Sql/servers",
+                    self.resource.name,
+                ),
+                azure_ad_admin_configured=bool(ad_admins),
+            )
+        ]
+
+
 def _required_mapping(mapping: dict, key: str, label: str) -> dict:
     value = mapping.get(key)
     if not isinstance(value, dict):
@@ -283,3 +453,65 @@ def _all_have_expiry(mapping: dict, key: str, label: str) -> bool:
         if not attributes.get("expires"):
             return False
     return True
+
+
+def _live_mapping(value: object, label: str) -> Mapping:
+    if not isinstance(value, Mapping):
+        raise InvalidCollectorResponseError(f"{label} response must be an object")
+    return value
+
+
+def _live_list(value: object, label: str) -> list:
+    if not isinstance(value, list):
+        raise InvalidCollectorResponseError(f"{label} response must be a list")
+    return value
+
+
+def _live_items_have_expiry(items: list, label: str) -> bool:
+    for index, item in enumerate(items):
+        item_mapping = _live_mapping(item, f"{label}[{index}]")
+        attributes = _live_mapping(
+            item_mapping.get("attributes"), f"{label}[{index}].attributes"
+        )
+        if not attributes.get("expires"):
+            return False
+    return True
+
+
+def _has_approved_private_endpoint(
+    private_endpoints: list,
+    resource_type: str,
+    resource_name: str,
+) -> bool:
+    target = f"/providers/{resource_type}/{resource_name}".lower()
+    for index, endpoint in enumerate(private_endpoints):
+        endpoint_mapping = _live_mapping(endpoint, f"private endpoints[{index}]")
+        endpoint_properties = endpoint_mapping.get("properties", endpoint_mapping)
+        endpoint_properties = _live_mapping(
+            endpoint_properties, f"private endpoints[{index}].properties"
+        )
+        connections = endpoint_properties.get("privateLinkServiceConnections") or []
+        if not isinstance(connections, list):
+            raise InvalidCollectorResponseError(
+                "privateLinkServiceConnections response must be a list"
+            )
+        for connection in connections:
+            connection_mapping = _live_mapping(
+                connection, "private endpoint connection"
+            )
+            connection_properties = connection_mapping.get(
+                "properties", connection_mapping
+            )
+            connection_properties = _live_mapping(
+                connection_properties, "private endpoint connection properties"
+            )
+            service_id = str(
+                connection_properties.get("privateLinkServiceId", "")
+            ).lower()
+            state = connection_properties.get("privateLinkServiceConnectionState", {})
+            state = _live_mapping(state, "private endpoint connection state")
+            if target in service_id and str(state.get("status", "")).lower() == (
+                "approved"
+            ):
+                return True
+    return False

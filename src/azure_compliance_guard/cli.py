@@ -5,7 +5,10 @@ import sys
 from importlib.resources import as_file, files
 from pathlib import Path
 
+from azure_compliance_guard.azure_cli import AzureCliJsonRunner
 from azure_compliance_guard.collectors import (
+    AzureKeyVaultCollector,
+    AzureSqlCollector,
     AzureStorageCollector,
     FixtureKeyVaultCollector,
     FixtureSqlCollector,
@@ -92,23 +95,60 @@ def _fixture_states(path: Path | None, service: str):
     return states
 
 
-def _azure_states():
-    required = {
-        name: os.getenv(name, "").strip()
-        for name in (
-            "AZURE_TENANT_ID",
-            "AZURE_CLIENT_ID",
-            "AZURE_CLIENT_SECRET",
-            "AZURE_SUBSCRIPTION_ID",
-            "RESOURCE_GROUP",
-            "STORAGE_ACCOUNT_NAME",
-        )
-    }
+def _required_environment(names: tuple[str, ...]) -> dict[str, str]:
+    required = {name: os.getenv(name, "").strip() for name in names}
     missing = sorted(name for name, value in required.items() if not value)
     if missing:
         raise InvalidRuleSetError(
             "missing Azure scan configuration: " + ", ".join(missing)
         )
+    return required
+
+
+def _azure_states(service: str):
+    if service == "all":
+        states = []
+        for selected in ("storage", "key-vault", "sql"):
+            states.extend(_azure_states(selected))
+        return states
+
+    common = _required_environment(("AZURE_SUBSCRIPTION_ID", "RESOURCE_GROUP"))
+    if service == "key-vault":
+        required = {
+            **common,
+            **_required_environment(("KEY_VAULT_NAME",)),
+        }
+        runner = AzureCliJsonRunner(required["AZURE_SUBSCRIPTION_ID"])
+        return AzureKeyVaultCollector(
+            runner,
+            required["RESOURCE_GROUP"],
+            required["KEY_VAULT_NAME"],
+            required["AZURE_SUBSCRIPTION_ID"],
+        ).collect()
+    if service == "sql":
+        required = {
+            **common,
+            **_required_environment(("SQL_SERVER_NAME",)),
+        }
+        runner = AzureCliJsonRunner(required["AZURE_SUBSCRIPTION_ID"])
+        return AzureSqlCollector(
+            runner,
+            required["RESOURCE_GROUP"],
+            required["SQL_SERVER_NAME"],
+            required["AZURE_SUBSCRIPTION_ID"],
+        ).collect()
+
+    required = {
+        **common,
+        **_required_environment(
+            (
+                "AZURE_TENANT_ID",
+                "AZURE_CLIENT_ID",
+                "AZURE_CLIENT_SECRET",
+                "STORAGE_ACCOUNT_NAME",
+            )
+        ),
+    }
 
     from azure.identity import ClientSecretCredential
     from azure.mgmt.storage import StorageManagementClient
@@ -134,11 +174,7 @@ def _run_scan(args: argparse.Namespace) -> int:
     if args.source == "fixture":
         states = _fixture_states(args.fixture, args.service)
     else:
-        if args.service != "storage":
-            raise InvalidRuleSetError(
-                "Azure source currently supports --service storage only"
-            )
-        states = _azure_states()
+        states = _azure_states(args.service)
     findings = evaluate_states(states, catalog)
     if args.format == "json":
         print(
