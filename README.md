@@ -9,17 +9,17 @@ Một lab DevSecOps phát hiện configuration drift trên Azure Storage, Key Va
 - Terraform tạo baseline private-first gồm VNet, Private Endpoint/DNS, Storage, Key Vault, SQL, Log Analytics, VPN Gateway và jumpbox.
 - Python engine thu thập trạng thái thực tế, so sánh với baseline và phân loại `WARNING`, `CRITICAL`, `ESCALATED_CRITICAL`.
 - Exception có thời hạn và incident có thể revoke exception.
-- Remediation mặc định ở chế độ plan-only; không có Azure mutation nếu operator chưa chủ động bật gate tạm thời.
+- Legacy monitor chỉ tạo gợi ý remediation. CLI Phase F tạo plan, dry-run, phê duyệt đúng hash, kiểm tra điều kiện, thực thi action cho phép và re-scan.
 
 ## Safety baseline
 
 - Azure CLI luôn được gọi bằng argument vector, kèm `--subscription` lấy từ `AZURE_SUBSCRIPTION_ID`; không dùng `shell=True`.
-- `ALLOW_AZURE_MUTATIONS` mặc định là `false`.
+- `ALLOW_AZURE_MUTATIONS` mặc định là `false` và chỉ là một gate bổ sung cho `acg remediation apply --execute`.
 - Microsoft Defender for SQL luôn là `MANUAL_ONLY` vì thao tác này thay đổi pricing ở scope subscription.
-- Incident containment cũng chỉ tạo plan khi mutation chưa được bật.
+- Legacy incident containment luôn chỉ tạo gợi ý, kể cả khi mutation gate được bật.
 - Không có `terraform apply` hoặc `terraform destroy` trong test/CI offline.
 
-`ALLOW_AZURE_MUTATIONS=true` chỉ là gate tạm thời của P0 cho lab có kiểm soát. Nó chưa thay thế workflow mục tiêu `Plan -> Approval -> Execute -> Verify`, vì chưa có plan hash, approval binding, stale-state check và post-remediation verification.
+Monitor cũ không còn thực thi Azure mutation dù `ALLOW_AZURE_MUTATIONS=true`. CLI Phase F yêu cầu plan Azure còn hạn, approval đúng `plan_id/hash`, exception store hợp lệ và trạng thái tài nguyên chưa đổi trước khi gọi executor.
 
 ## Luồng hiện tại
 
@@ -124,6 +124,23 @@ invalid configuration or rules. The packaged drift fixture intentionally exits
 with `1`. Current offline scope and deferred live-validation work are recorded in
 [`docs/phase-e-status.md`](docs/phase-e-status.md).
 
+## Phase F remediation workflow
+
+Có thể kiểm tra lập kế hoạch và dry-run mà không cần Azure:
+
+```powershell
+$planPath = Join-Path $env:TEMP "acg-plan-$PID.json"
+$approvalPath = Join-Path $env:TEMP "acg-approval-$PID.json"
+acg remediation plan --finding ACG-STO-001 --source fixture --output $planPath
+$plan = Get-Content $planPath -Raw | ConvertFrom-Json
+acg remediation approve --plan $planPath --approver $env:USERNAME --confirm-hash $plan.plan_hash --output $approvalPath
+acg remediation apply --plan $planPath --dry-run
+```
+
+`--finding` nhận `finding_id` từ kết quả `acg scan --format json`, hoặc rule ID nếu chỉ có một finding khớp; thêm `--resource` để chọn tài nguyên khi cần. Plan và approval là JSON riêng, không ghi đè file có sẵn. Plan từ fixture không thể được thực thi trên Azure.
+
+Đường thực thi lab dùng plan tạo từ `--source azure`, `--execute`, approval file, `ALLOW_AZURE_MUTATIONS=true`, và `--exceptions` trỏ tới file JSON exception đã review (có thể là `[]`). Trước mutation, CLI xác nhận subscription, rule, handler, plan hash, hạn dùng, approval, exception và toàn bộ trạng thái before. Storage dùng management SDK; Key Vault và SQL dùng Azure CLI với argument vector, subscription cố định và timeout. Sau khi Azure nhận update, trạng thái chỉ thành `VERIFIED` nếu collector đọc lại và cùng rule trả PASS. Xem [trạng thái Phase F](docs/phase-f-status.md) về action được phép và giới hạn hiện tại.
+
 ## Jumpbox SSH key
 
 Jumpbox private cần `jumpbox_ssh_public_key` và không cho đăng nhập bằng mật khẩu. Trước lần `terraform plan/apply` sau này, tạo cặp khóa trên máy của bạn; chỉ đưa public key cho Terraform. Trong PowerShell:
@@ -149,7 +166,7 @@ Chỉ sau khi workflow chạy thành công trên GitHub mới có thể coi CI l
 Python engine hiện dùng hai nguồn identity khác nhau:
 
 - Storage SDK: service principal từ biến môi trường.
-- Key Vault/SQL collectors và remediation: identity đã đăng nhập Azure CLI, nhưng mọi lệnh được scope bằng `AZURE_SUBSCRIPTION_ID` trong `.env`.
+- Key Vault/SQL collectors và executor Phase F: identity đã đăng nhập Azure CLI, nhưng mọi lệnh được scope bằng `AZURE_SUBSCRIPTION_ID` trong `.env`. Legacy monitor chỉ đọc và tạo gợi ý.
 
 Đây là limitation đã biết. Chỉ chạy trong lab riêng, với identity và RBAC tối thiểu phù hợp từng thao tác. Không cấp `Contributor` ở subscription chỉ để monitor hoạt động.
 Trước khi chạy monitor, kiểm tra `az account show --subscription <subscription-id-from-.env> --query id -o tsv` truy cập được subscription mới; nếu Azure CLI chưa đăng nhập hoặc identity không có quyền ở subscription đó, các collector Key Vault/SQL sẽ không hoạt động dù Storage SDK có credential riêng. Engine từ chối lệnh CLI khi ID thiếu/sai định dạng hoặc có tham số cố override subscription.
@@ -171,16 +188,17 @@ RESOURCE_GROUP
 STORAGE_ACCOUNT_NAME
 KEY_VAULT_NAME
 SQL_SERVER_NAME
-ALLOW_AZURE_MUTATIONS=false
 ```
+
+`ALLOW_AZURE_MUTATIONS=true` chỉ dùng khi chủ động chạy `acg remediation apply --execute`, không bật mutation cho monitor cũ.
 
 Không commit `.env`, Terraform state, `*.tfvars`, log, database hoặc private evidence.
 
 ## Known limitations
 
-- CLI mới đã chuẩn hóa `doctor`, `scan` và `watch`; các workflow remediation, incident, exception và evidence cũ chưa được migrate sang package mới.
+- CLI mới có `doctor`, `scan`, `watch` và remediation Phase F; incident, exception governance và evidence còn ở các phase sau.
 - Storage, Key Vault và SQL đã có 17 rule YAML schema-v1; mapping CIS/Azure Policy/Prowler vẫn chưa được xác minh bằng nguồn pinned và lab live.
-- Chưa có approval artifact, stale-plan protection, rollback hoặc verification loop.
+- Approval file Phase F là xác nhận cục bộ tự khai báo, chưa có xác thực danh tính hoặc chữ ký số. Chưa có rollback hay ledger bền vững chống chạy lặp sau lỗi không rõ kết quả.
 - Incident detection vẫn dựa trên fixture local, chưa phải Azure Monitor/KQL.
 - Exception state và evidence còn dùng file local; chưa có SQLite/HTML report.
 - Offline CI và IaC scan đã được cấu hình ở Phase D nhưng chưa xác nhận run xanh trên GitHub; OIDC và CodeQL/default secret scanning vẫn cần triển khai hoặc bật trong GitHub Settings.
