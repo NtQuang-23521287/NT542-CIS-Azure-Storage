@@ -80,6 +80,39 @@ terraform validate -no-color
 
 Pytest mặc định bỏ qua test gắn marker `live`; dùng `python -m pytest -m "not live"` để kiểm tra tường minh. Các test Phase C dùng fixture/mock và không đăng nhập hay tạo tài nguyên Azure.
 
+## Phase E CLI (Storage offline slice)
+
+The installable CLI uses the `src/azure_compliance_guard` package while the
+legacy monitor remains available during the incremental migration. Install the
+project with Python 3.14, then inspect the command surface:
+
+```powershell
+python -m pip install -e .
+acg --help
+```
+
+`doctor` is read-only. It checks the Python runtime, Azure CLI and authentication,
+subscription selection, Terraform, SQLite, optional Log Analytics configuration,
+and confirms that Azure mutation is disabled by default:
+
+```powershell
+acg doctor
+```
+
+The deterministic offline scan uses the packaged intentional-drift fixture and
+the versioned Storage rule catalog:
+
+```powershell
+acg scan --source fixture
+acg scan --source fixture --format json
+```
+
+CLI exit codes are stable: `0` means no blocking findings, `1` means policy
+findings were detected, `2` means an operational/runtime failure, and `3` means
+invalid configuration or rules. The packaged drift fixture intentionally exits
+with `1`. Current scope and deferred Phase E work are recorded in
+[`docs/phase-e-status.md`](docs/phase-e-status.md).
+
 ## Jumpbox SSH key
 
 Jumpbox private cần `jumpbox_ssh_public_key` và không cho đăng nhập bằng mật khẩu. Trước lần `terraform plan/apply` sau này, tạo cặp khóa trên máy của bạn; chỉ đưa public key cho Terraform. Trong PowerShell:

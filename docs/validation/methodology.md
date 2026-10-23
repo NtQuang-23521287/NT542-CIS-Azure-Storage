@@ -1,6 +1,6 @@
 # Storage validation baseline (Phase A5)
 
-Status: methodology only, recorded 2026-10-22. No live comparison has been run and no rule is claimed as CIS-validated.
+Status: offline Storage cases implemented 2026-10-23. No live comparison has been run and no rule is claimed as CIS-validated.
 
 ## References and order of evidence
 
@@ -16,6 +16,13 @@ Reference versions selected for reproducibility: [CIS Microsoft Azure Storage Se
 Start with the four current Storage evaluator findings in [control-crosswalk.md](control-crosswalk.md). For each supported control, prepare one secure state and one intentional drift on an isolated lab account. Record case ID, setup, raw and normalized ARM observations, expected `PASS`/`FAIL` or `NOT_APPLICABLE`, cleanup path, and timestamps. Do not decide expected results from agreement between tools.
 
 Offline CI may evaluate sanitized fixtures with no Azure credentials. Live ACG/Prowler/Policy comparison is manual, read-only, and must not trigger remediation. Compare the same resource and policy semantics, account for Azure Policy evaluation delay, and classify missing/failed results as `ERROR` or `NOT_COMPARABLE`, never `PASS`. Keep raw output private; publish only sanitized evidence and explained disagreements.
+
+The current offline dataset is versioned under `tests/fixtures/validation/` and
+contains one reviewed secure case plus one intentional-drift case. Run it with:
+
+```powershell
+python -m pytest tests/integration/test_phase_e_validation_dataset.py -q
+```
 
 ## Access and cost preflight for a later live run
 
