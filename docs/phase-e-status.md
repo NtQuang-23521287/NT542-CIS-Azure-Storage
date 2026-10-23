@@ -25,7 +25,7 @@ dedicated lab, read-only access, and reviewed external mappings.
 - Python 3.14.3: package and test environment resolved from the hashed development lock.
 - `acg scan --source fixture --service all --format json`: deterministic offline path covers three resources and 17 intentional findings.
 - `acg watch`: bounded text/JSONL behavior is covered by integration tests; it sleeps only between cycles.
-- Offline suite: 77 tests plus 2 subtests passed.
+- Offline suite: 81 tests plus 2 subtests passed.
 - CI-scoped coverage: 81.31% (required threshold: 80%).
 - Ruff lint and format: passed.
 - The Azure CLI adapter uses argument vectors, an explicit validated subscription, a timeout, JSON output, and `shell=False`.

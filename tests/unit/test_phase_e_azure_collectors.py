@@ -104,6 +104,34 @@ def test_key_vault_cli_collector_returns_typed_state():
     assert runner.run.call_count == 4
 
 
+def test_key_vault_collector_rejects_private_endpoint_for_different_resource():
+    runner = Mock()
+    runner.run.side_effect = [
+        {"properties": {}},
+        [],
+        [],
+        [
+            {
+                "privateLinkServiceConnections": [
+                    {
+                        "privateLinkServiceId": (
+                            f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/other-rg/"
+                            "providers/Microsoft.KeyVault/vaults/kv-demo-suffix"
+                        ),
+                        "privateLinkServiceConnectionState": {"status": "Approved"},
+                    }
+                ]
+            }
+        ],
+    ]
+
+    state = AzureKeyVaultCollector(
+        runner, "rg-demo", "kv-demo", SUBSCRIPTION_ID
+    ).collect()[0]
+
+    assert state.private_endpoint_enabled is False
+
+
 def test_sql_cli_collector_returns_typed_state_and_reads_pricing():
     runner = Mock()
     runner.run.side_effect = [

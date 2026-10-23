@@ -299,7 +299,7 @@ class AzureKeyVaultCollector:
                 private_endpoint_enabled=_has_approved_private_endpoint(
                     private_endpoints,
                     "Microsoft.KeyVault/vaults",
-                    self.resource.name,
+                    self.resource,
                 ),
                 keys_have_expiry=_live_items_have_expiry(keys, "key list"),
                 secrets_have_expiry=_live_items_have_expiry(secrets, "secret list"),
@@ -391,7 +391,7 @@ class AzureSqlCollector:
                 private_endpoint_enabled=_has_approved_private_endpoint(
                     private_endpoints,
                     "Microsoft.Sql/servers",
-                    self.resource.name,
+                    self.resource,
                 ),
                 azure_ad_admin_configured=bool(ad_admins),
             )
@@ -481,9 +481,13 @@ def _live_items_have_expiry(items: list, label: str) -> bool:
 def _has_approved_private_endpoint(
     private_endpoints: list,
     resource_type: str,
-    resource_name: str,
+    resource: ResourceRef,
 ) -> bool:
-    target = f"/providers/{resource_type}/{resource_name}".lower()
+    target = (
+        f"/subscriptions/{resource.subscription_id}"
+        f"/resourceGroups/{resource.resource_group}"
+        f"/providers/{resource_type}/{resource.name}"
+    ).lower()
     for index, endpoint in enumerate(private_endpoints):
         endpoint_mapping = _live_mapping(endpoint, f"private endpoints[{index}]")
         endpoint_properties = endpoint_mapping.get("properties", endpoint_mapping)
@@ -510,8 +514,7 @@ def _has_approved_private_endpoint(
             ).lower()
             state = connection_properties.get("privateLinkServiceConnectionState", {})
             state = _live_mapping(state, "private endpoint connection state")
-            if target in service_id and str(state.get("status", "")).lower() == (
-                "approved"
-            ):
+            connection_approved = str(state.get("status", "")).lower() == "approved"
+            if service_id.rstrip("/") == target and connection_approved:
                 return True
     return False

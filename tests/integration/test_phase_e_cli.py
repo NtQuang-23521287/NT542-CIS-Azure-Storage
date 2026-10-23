@@ -130,7 +130,7 @@ def test_azure_scan_uses_key_vault_read_only_adapter(capsys, monkeypatch):
     monkeypatch.setenv("AZURE_SUBSCRIPTION_ID", "00000000-0000-0000-0000-000000000001")
     monkeypatch.setenv("RESOURCE_GROUP", "rg-demo")
     monkeypatch.setenv("KEY_VAULT_NAME", "kv-demo")
-    runner = object()
+    runner = Mock(subscription_id="00000000-0000-0000-0000-000000000001")
     monkeypatch.setattr(cli, "AzureCliJsonRunner", lambda subscription_id: runner)
     collector = Mock()
     collector.collect.return_value = [
@@ -169,7 +169,7 @@ def test_azure_scan_uses_sql_read_only_adapter(capsys, monkeypatch):
     monkeypatch.setenv("AZURE_SUBSCRIPTION_ID", "00000000-0000-0000-0000-000000000001")
     monkeypatch.setenv("RESOURCE_GROUP", "rg-demo")
     monkeypatch.setenv("SQL_SERVER_NAME", "sql-demo")
-    runner = object()
+    runner = Mock(subscription_id="00000000-0000-0000-0000-000000000001")
     monkeypatch.setattr(cli, "AzureCliJsonRunner", lambda subscription_id: runner)
     collector = Mock()
     collector.collect.return_value = [
@@ -270,8 +270,9 @@ def test_watch_jsonl_emits_one_document_per_cycle(capsys, monkeypatch):
     assert all(item["summary"] == {"resources": 1, "findings": 6} for item in documents)
 
 
-def test_watch_rejects_non_positive_interval():
+@pytest.mark.parametrize("interval", ["0", "-1", "nan", "inf"])
+def test_watch_rejects_invalid_interval(interval):
     with pytest.raises(SystemExit) as error:
-        main(["watch", "--interval", "0"])
+        main(["watch", "--interval", interval])
 
     assert error.value.code == 2

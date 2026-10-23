@@ -1,5 +1,6 @@
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -31,8 +32,8 @@ EXIT_CONFIGURATION_ERROR = 3
 
 def _positive_float(value: str) -> float:
     parsed = float(value)
-    if parsed <= 0:
-        raise argparse.ArgumentTypeError("must be greater than zero")
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise argparse.ArgumentTypeError("must be finite and greater than zero")
     return parsed
 
 
@@ -148,7 +149,7 @@ def _azure_states(service: str):
             runner,
             required["RESOURCE_GROUP"],
             required["KEY_VAULT_NAME"],
-            required["AZURE_SUBSCRIPTION_ID"],
+            runner.subscription_id,
         ).collect()
     if service == "sql":
         required = {
@@ -160,7 +161,7 @@ def _azure_states(service: str):
             runner,
             required["RESOURCE_GROUP"],
             required["SQL_SERVER_NAME"],
-            required["AZURE_SUBSCRIPTION_ID"],
+            runner.subscription_id,
         ).collect()
 
     required = {
