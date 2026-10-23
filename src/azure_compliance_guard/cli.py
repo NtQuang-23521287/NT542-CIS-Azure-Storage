@@ -7,6 +7,8 @@ from pathlib import Path
 
 from azure_compliance_guard.collectors import (
     AzureStorageCollector,
+    FixtureKeyVaultCollector,
+    FixtureSqlCollector,
     FixtureStorageCollector,
 )
 from azure_compliance_guard.doctor import collect_doctor_checks
@@ -32,6 +34,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     scan = subparsers.add_parser("scan", help="run one compliance scan and exit")
     scan.add_argument("--source", choices=("azure", "fixture"), default="azure")
+    scan.add_argument(
+        "--service",
+        choices=("storage", "key-vault", "sql", "all"),
+        default="storage",
+    )
     scan.add_argument("--fixture", type=Path)
     scan.add_argument("--rules", type=Path)
     scan.add_argument("--format", choices=("text", "json"), default="text")
@@ -52,12 +59,37 @@ def _run_doctor(output_format: str) -> int:
     )
 
 
-def _fixture_states(path: Path | None):
-    if path is not None:
-        return FixtureStorageCollector(path).collect()
-    packaged = files("azure_compliance_guard").joinpath("fixtures/storage_drift.json")
-    with as_file(packaged) as fixture_path:
-        return FixtureStorageCollector(fixture_path).collect()
+FIXTURE_COLLECTORS = {
+    "storage": FixtureStorageCollector,
+    "key-vault": FixtureKeyVaultCollector,
+    "sql": FixtureSqlCollector,
+}
+PACKAGED_DRIFT_FIXTURES = {
+    "storage": "storage_drift.json",
+    "key-vault": "key_vault_drift.json",
+    "sql": "sql_drift.json",
+}
+
+
+def _selected_services(service: str) -> tuple[str, ...]:
+    if service == "all":
+        return tuple(FIXTURE_COLLECTORS)
+    return (service,)
+
+
+def _fixture_states(path: Path | None, service: str):
+    states = []
+    for selected in _selected_services(service):
+        collector = FIXTURE_COLLECTORS[selected]
+        if path is not None:
+            states.extend(collector(path).collect())
+            continue
+        packaged = files("azure_compliance_guard").joinpath(
+            f"fixtures/{PACKAGED_DRIFT_FIXTURES[selected]}"
+        )
+        with as_file(packaged) as fixture_path:
+            states.extend(collector(fixture_path).collect())
+    return states
 
 
 def _azure_states():
@@ -99,9 +131,14 @@ def _run_scan(args: argparse.Namespace) -> int:
     catalog = (
         load_rule_catalog(args.rules) if args.rules else load_default_rule_catalog()
     )
-    states = (
-        _fixture_states(args.fixture) if args.source == "fixture" else _azure_states()
-    )
+    if args.source == "fixture":
+        states = _fixture_states(args.fixture, args.service)
+    else:
+        if args.service != "storage":
+            raise InvalidRuleSetError(
+                "Azure source currently supports --service storage only"
+            )
+        states = _azure_states()
     findings = evaluate_states(states, catalog)
     if args.format == "json":
         print(

@@ -56,6 +56,78 @@ def test_fixture_scan_is_one_shot_and_returns_policy_exit_code(capsys):
     ]
 
 
+def test_fixture_scan_can_select_key_vault(capsys):
+    exit_code = main(
+        [
+            "scan",
+            "--source",
+            "fixture",
+            "--service",
+            "key-vault",
+            "--format",
+            "json",
+        ]
+    )
+
+    output = json.loads(capsys.readouterr().out)
+    assert exit_code == 1
+    assert output["summary"] == {"resources": 1, "findings": 7}
+    assert [item["rule_id"] for item in output["findings"]] == [
+        f"ACG-KV-{index:03d}" for index in range(1, 8)
+    ]
+
+
+def test_fixture_scan_can_select_sql(capsys):
+    exit_code = main(
+        [
+            "scan",
+            "--source",
+            "fixture",
+            "--service",
+            "sql",
+            "--format",
+            "json",
+        ]
+    )
+
+    output = json.loads(capsys.readouterr().out)
+    assert exit_code == 1
+    assert output["summary"] == {"resources": 1, "findings": 6}
+    assert [item["rule_id"] for item in output["findings"]] == [
+        f"ACG-SQL-{index:03d}" for index in range(1, 7)
+    ]
+
+
+def test_fixture_scan_can_evaluate_all_services(capsys):
+    exit_code = main(
+        [
+            "scan",
+            "--source",
+            "fixture",
+            "--service",
+            "all",
+            "--format",
+            "json",
+        ]
+    )
+
+    output = json.loads(capsys.readouterr().out)
+    assert exit_code == 1
+    assert output["summary"] == {"resources": 3, "findings": 17}
+    assert {item["service"] for item in output["findings"]} == {
+        "storage",
+        "key_vault",
+        "sql",
+    }
+
+
+def test_azure_scan_rejects_service_without_live_adapter(capsys):
+    exit_code = main(["scan", "--source", "azure", "--service", "sql"])
+
+    assert exit_code == 3
+    assert "supports --service storage only" in capsys.readouterr().err
+
+
 def test_missing_fixture_is_an_operational_failure(capsys, tmp_path):
     missing = tmp_path / "missing.json"
 
