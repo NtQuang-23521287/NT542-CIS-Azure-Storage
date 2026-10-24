@@ -1,5 +1,7 @@
 """SQLite exception governance uses real temporary databases, never Azure."""
 
+import sqlite3
+from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -8,6 +10,7 @@ from azure_compliance_guard.exceptions import (
     ActiveExceptionConflict,
     ExceptionRepository,
     ExceptionStoreError,
+    InvalidTransition,
     VersionConflict,
 )
 
@@ -55,6 +58,9 @@ def test_request_activate_and_filter_are_persistent(tmp_path):
         pending.id
     ]
     assert repo.list(status="REQUESTED") == []
+    assert repo.has_active(RESOURCE, "ACG-STO-001", now=NOW)
+    assert not repo.has_active(RESOURCE, "OTHER-RULE", now=NOW)
+    assert not repo.has_active(RESOURCE, "ACG-STO-001", now=NOW + timedelta(minutes=31))
 
 
 def test_duplicate_active_is_rejected_without_changing_second_request(tmp_path):
@@ -104,3 +110,172 @@ def test_missing_store_and_invalid_request_fail_closed(tmp_path):
             now=NOW,
         )
     assert repo.list() == []
+
+
+def test_expire_revoke_and_incident_revoke_write_distinct_events(tmp_path):
+    repo = ExceptionRepository(tmp_path / "exceptions.sqlite3")
+    repo.initialize()
+
+    expired = repo.activate(
+        request(repo).id, approved_by="reviewer", expected_version=1, now=NOW
+    )
+    with pytest.raises(InvalidTransition):
+        repo.expire(expired.id, expected_version=2, now=NOW)
+    closed = repo.expire(
+        expired.id, expected_version=2, now=NOW + timedelta(minutes=31)
+    )
+    assert (closed.status, closed.version) == ("EXPIRED", 3)
+
+    regular = repo.activate(
+        request(repo, ticket="LAB-2").id,
+        approved_by="reviewer",
+        expected_version=1,
+        now=NOW,
+    )
+    revoked = repo.revoke(
+        regular.id,
+        actor="operator",
+        reason="risk accepted no longer",
+        expected_version=2,
+        now=NOW,
+    )
+    assert (revoked.status, revoked.version, revoked.closed_reason) == (
+        "REVOKED",
+        3,
+        "risk accepted no longer",
+    )
+
+    incident = repo.activate(
+        request(repo, ticket="LAB-3").id,
+        approved_by="reviewer",
+        expected_version=1,
+        now=NOW,
+    )
+    repo.revoke(
+        incident.id,
+        actor="incident-handler",
+        reason="suspicious access",
+        expected_version=2,
+        incident=True,
+        now=NOW,
+    )
+    assert repo.verify_chain() == 9
+    with sqlite3.connect(repo.path) as db:
+        kinds = [
+            row[0] for row in db.execute("SELECT event_type FROM exception_events")
+        ]
+    assert kinds == [
+        "CREATED",
+        "ACTIVATED",
+        "EXPIRED",
+        "CREATED",
+        "ACTIVATED",
+        "REVOKED",
+        "CREATED",
+        "ACTIVATED",
+        "INCIDENT_REVOKED",
+    ]
+
+
+def test_hash_verifier_detects_event_and_state_tampering(tmp_path):
+    repo = ExceptionRepository(tmp_path / "exceptions.sqlite3")
+    repo.initialize()
+    active = repo.activate(
+        request(repo).id, approved_by="reviewer", expected_version=1, now=NOW
+    )
+    assert repo.verify_chain() == 2
+
+    with sqlite3.connect(repo.path) as db:
+        db.execute("UPDATE exception_events SET actor = 'forged' WHERE event_id = 1")
+    with pytest.raises(ExceptionStoreError, match="hash chain"):
+        repo.verify_chain()
+
+    with sqlite3.connect(repo.path) as db:
+        db.execute("UPDATE exception_events SET actor = 'student' WHERE event_id = 1")
+        db.execute("UPDATE exceptions SET reason = 'forged' WHERE id = ?", (active.id,))
+    with pytest.raises(ExceptionStoreError, match="state does not match"):
+        repo.verify_chain()
+    with pytest.raises(ExceptionStoreError, match="state does not match"):
+        repo.has_active(RESOURCE, "ACG-STO-001", now=NOW)
+    with pytest.raises(ExceptionStoreError, match="state does not match"):
+        repo.revoke(
+            active.id,
+            actor="operator",
+            reason="test",
+            expected_version=2,
+            now=NOW,
+        )
+
+
+def test_concurrent_activation_has_one_winner(tmp_path):
+    repo = ExceptionRepository(tmp_path / "exceptions.sqlite3", timeout=5)
+    repo.initialize()
+    ids = [request(repo, ticket=f"LAB-{number}").id for number in (1, 2)]
+
+    def activate(exception_id):
+        try:
+            return repo.activate(
+                exception_id, approved_by="reviewer", expected_version=1, now=NOW
+            ).status
+        except ActiveExceptionConflict:
+            return "CONFLICT"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(activate, ids))
+    assert sorted(results) == ["ACTIVE", "CONFLICT"]
+    assert len(repo.list(status="ACTIVE")) == 1
+    assert repo.verify_chain() == 3
+
+
+def test_concurrent_revoke_and_expire_cannot_overwrite_each_other(tmp_path):
+    repo = ExceptionRepository(tmp_path / "exceptions.sqlite3", timeout=5)
+    repo.initialize()
+    active = repo.activate(
+        request(repo).id, approved_by="reviewer", expected_version=1, now=NOW
+    )
+
+    def close(kind):
+        try:
+            if kind == "expire":
+                return repo.expire(
+                    active.id, expected_version=2, now=NOW + timedelta(minutes=31)
+                ).status
+            return repo.revoke(
+                active.id,
+                actor="operator",
+                reason="incident",
+                expected_version=2,
+                now=NOW + timedelta(minutes=31),
+            ).status
+        except VersionConflict:
+            return "CONFLICT"
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(close, ("expire", "revoke")))
+    assert "CONFLICT" in outcomes
+    assert set(outcomes) & {"EXPIRED", "REVOKED"}
+    assert repo.get(active.id).version == 3
+    assert repo.verify_chain() == 3
+
+
+def test_locked_database_is_an_operational_error(tmp_path):
+    repo = ExceptionRepository(tmp_path / "exceptions.sqlite3", timeout=0)
+    repo.initialize()
+    with sqlite3.connect(repo.path, autocommit=True) as blocker:
+        blocker.execute("BEGIN IMMEDIATE")
+        with pytest.raises(ExceptionStoreError):
+            request(repo)
+        blocker.execute("ROLLBACK")
+    assert repo.list() == []
+
+
+def test_corrupt_database_is_not_treated_as_empty(tmp_path):
+    path = tmp_path / "exceptions.sqlite3"
+    path.write_bytes(b"not a SQLite database")
+    repo = ExceptionRepository(path)
+
+    with pytest.raises(ExceptionStoreError):
+        repo.list()
+    with pytest.raises(ExceptionStoreError):
+        repo.has_active(RESOURCE, "ACG-STO-001", now=NOW)
+    assert path.read_bytes() == b"not a SQLite database"

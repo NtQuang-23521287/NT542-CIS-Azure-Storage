@@ -165,6 +165,7 @@ class ExceptionRepository:
             # BEGIN IMMEDIATE serializes read-then-write transitions and the
             # global hash chain. See https://www.sqlite.org/lang_transaction.html
             db.execute("BEGIN IMMEDIATE")
+            self._verify_chain(db)
             yield db
             db.execute("COMMIT")
         except BaseException as exc:
@@ -189,6 +190,17 @@ class ExceptionRepository:
         actor: str,
         details: dict,
     ) -> None:
+        state = db.execute(
+            "SELECT * FROM exceptions WHERE id = ?", (exception_id,)
+        ).fetchone()
+        if state is None:
+            raise ExceptionStoreError("event has no exception state")
+        details = {
+            **details,
+            "record_hash": hashlib.sha256(
+                _canonical(dict(state)).encode("utf-8")
+            ).hexdigest(),
+        }
         previous = db.execute(
             "SELECT event_hash FROM exception_events ORDER BY event_id DESC LIMIT 1"
         ).fetchone()
@@ -317,9 +329,144 @@ class ExceptionRepository:
             ).fetchone()
             return self._record(updated)
 
+    def expire(
+        self,
+        exception_id: str,
+        *,
+        expected_version: int,
+        now: datetime | None = None,
+    ) -> ExceptionRecord:
+        return self._close(
+            exception_id,
+            expected_version=expected_version,
+            event_type="EXPIRED",
+            actor="system",
+            reason="time limit reached",
+            now=now,
+        )
+
+    def revoke(
+        self,
+        exception_id: str,
+        *,
+        actor: str,
+        reason: str,
+        expected_version: int,
+        incident: bool = False,
+        now: datetime | None = None,
+    ) -> ExceptionRecord:
+        return self._close(
+            exception_id,
+            expected_version=expected_version,
+            event_type="INCIDENT_REVOKED" if incident else "REVOKED",
+            actor=_text(actor, "actor", 255),
+            reason=_text(reason, "reason", 2000),
+            now=now,
+        )
+
+    def _close(
+        self,
+        exception_id: str,
+        *,
+        expected_version: int,
+        event_type: str,
+        actor: str,
+        reason: str,
+        now: datetime | None,
+    ) -> ExceptionRecord:
+        current = _utc(now or datetime.now(UTC))
+        with self._write() as db:
+            row = db.execute(
+                "SELECT * FROM exceptions WHERE id = ?", (exception_id,)
+            ).fetchone()
+            if row is None:
+                raise ExceptionStoreError("exception does not exist")
+            if row["version"] != expected_version:
+                raise VersionConflict("exception version changed")
+            if row["status"] != "ACTIVE":
+                raise InvalidTransition("only active exceptions may be closed")
+            if (
+                event_type == "EXPIRED"
+                and datetime.fromisoformat(row["expires_at"]) > current
+            ):
+                raise InvalidTransition("active exception has not reached expiry")
+            status = "EXPIRED" if event_type == "EXPIRED" else "REVOKED"
+            db.execute(
+                """UPDATE exceptions SET status = ?, closed_at = ?,
+                closed_reason = ?, version = version + 1 WHERE id = ?""",
+                (status, current.isoformat(), reason, exception_id),
+            )
+            self._event(
+                db,
+                exception_id,
+                event_type,
+                current.isoformat(),
+                actor,
+                {"reason": reason, "expected_version": expected_version},
+            )
+            updated = db.execute(
+                "SELECT * FROM exceptions WHERE id = ?", (exception_id,)
+            ).fetchone()
+            return self._record(updated)
+
+    @staticmethod
+    def _verify_chain(db: sqlite3.Connection) -> int:
+        previous_hash = GENESIS_HASH
+        last_record_hashes = {}
+        count = 0
+        for row in db.execute("SELECT * FROM exception_events ORDER BY event_id"):
+            count += 1
+            if row["event_id"] != count or row["previous_hash"] != previous_hash:
+                raise ExceptionStoreError("exception event hash chain is broken")
+            try:
+                details = json.loads(row["details_json"])
+                if not isinstance(details, dict) or row["details_json"] != _canonical(
+                    details
+                ):
+                    raise ValueError("noncanonical event details")
+            except (ValueError, TypeError) as exc:
+                raise ExceptionStoreError(
+                    "exception event hash chain is invalid"
+                ) from exc
+            payload = {
+                "exception_id": row["exception_id"],
+                "event_type": row["event_type"],
+                "occurred_at": row["occurred_at"],
+                "actor": row["actor"],
+                "details": details,
+                "previous_hash": previous_hash,
+            }
+            computed = hashlib.sha256(_canonical(payload).encode("utf-8")).hexdigest()
+            if computed != row["event_hash"]:
+                raise ExceptionStoreError("exception event hash chain is broken")
+            last_record_hashes[row["exception_id"]] = details.get("record_hash")
+            previous_hash = computed
+        record_ids = set()
+        for row in db.execute("SELECT * FROM exceptions"):
+            record_ids.add(row["id"])
+            current_hash = hashlib.sha256(
+                _canonical(dict(row)).encode("utf-8")
+            ).hexdigest()
+            if last_record_hashes.get(row["id"]) != current_hash:
+                raise ExceptionStoreError("exception state does not match audit events")
+        if record_ids != set(last_record_hashes):
+            raise ExceptionStoreError("exception state does not match audit events")
+        return count
+
+    def verify_chain(self) -> int:
+        db = self._open()
+        try:
+            return self._verify_chain(db)
+        except sqlite3.Error as exc:
+            raise ExceptionStoreError("exception database read failed") from exc
+        finally:
+            db.close()
+
     def get(self, exception_id: str) -> ExceptionRecord | None:
         db = self._open()
         try:
+            db.execute("BEGIN")
+            self._verify_chain(db)
             row = db.execute(
                 "SELECT * FROM exceptions WHERE id = ?", (exception_id,)
             ).fetchone()
@@ -348,7 +495,28 @@ class ExceptionRepository:
         query += " ORDER BY created_at, id"
         db = self._open()
         try:
+            db.execute("BEGIN")
+            self._verify_chain(db)
             return [self._record(row) for row in db.execute(query, values)]
+        except sqlite3.Error as exc:
+            raise ExceptionStoreError("exception database read failed") from exc
+        finally:
+            db.close()
+
+    def has_active(
+        self, resource_id: str, rule_id: str, *, now: datetime | None = None
+    ) -> bool:
+        current = _utc(now or datetime.now(UTC))
+        db = self._open()
+        try:
+            db.execute("BEGIN")
+            self._verify_chain(db)
+            rows = db.execute(
+                """SELECT expires_at FROM exceptions
+                WHERE resource_id = ? AND rule_id = ? AND status = 'ACTIVE'""",
+                (resource_id.lower(), rule_id),
+            )
+            return any(datetime.fromisoformat(row[0]) > current for row in rows)
         except sqlite3.Error as exc:
             raise ExceptionStoreError("exception database read failed") from exc
         finally:
