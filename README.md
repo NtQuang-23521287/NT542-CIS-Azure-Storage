@@ -124,6 +124,29 @@ invalid configuration or rules. The packaged drift fixture intentionally exits
 with `1`. Current offline scope and deferred live-validation work are recorded in
 [`docs/phase-e-status.md`](docs/phase-e-status.md).
 
+## Phase H evidence report (offline)
+
+Install the project, then run the roadmap checkpoint from the repository root:
+
+```powershell
+acg scan --source fixtures/demo_environment.json --output build/evidence.jsonl
+acg report --input build/evidence.jsonl --output build/report.html --redact
+```
+
+The demo fixture intentionally produces findings, so `scan` exits with code `1`;
+the JSONL evidence is still written and `report` exits with `0`. Open
+`build/report.html` locally. The committed [sample report](docs/samples/phase-h-report.html)
+and [sample evidence](docs/samples/phase-h-evidence.jsonl) include fixture-only
+validation and explicitly simulated lifecycle events. Generate them again in a
+fresh directory with `python -m scripts.phase_h_sample <directory>`.
+
+The report always applies public redaction. Keep evidence generated from an
+Azure subscription and any operational report private under `build/` or
+`reports/private/`. Retain them for at most 30 days for this lab, then remove
+them according to your local retention procedure. There is no automatic upload
+or GitHub Pages publication. See [Phase H status](docs/phase-h-status.md) for
+data provenance, validation scope, and current limits.
+
 ## Phase F remediation workflow
 
 Có thể kiểm tra lập kế hoạch và dry-run mà không cần Azure:
@@ -196,12 +219,12 @@ Không commit `.env`, Terraform state, `*.tfvars`, log, database hoặc private 
 
 ## Known limitations
 
-- The CLI provides `doctor`, `scan`, `watch`, Phase F remediation, and Phase G SQLite exception governance. Evidence work remains in later phases.
+- The CLI provides `doctor`, `scan`, `watch`, Phase F remediation, Phase G SQLite exception governance, and Phase H local JSONL/HTML reporting. Automated lifecycle export is still pending.
 - Storage, Key Vault và SQL đã có 17 rule YAML schema-v1; mapping CIS/Azure Policy/Prowler vẫn chưa được xác minh bằng nguồn pinned và lab live.
 - Approval file Phase F là xác nhận cục bộ tự khai báo, chưa có xác thực danh tính hoặc chữ ký số. Chưa có rollback hay ledger bền vững chống chạy lặp sau lỗi không rõ kết quả.
 - Incident detection vẫn dựa trên fixture local, chưa phải Azure Monitor/KQL.
-- Exception state và evidence còn dùng file local; chưa có SQLite/HTML report.
-- Offline CI và IaC scan đã được cấu hình ở Phase D nhưng chưa xác nhận run xanh trên GitHub; OIDC và CodeQL/default secret scanning vẫn cần triển khai hoặc bật trong GitHub Settings.
+- Exception state uses local SQLite. Evidence and sanitized HTML reports are local files; there is no remote audit store or authenticated publication workflow.
+- Offline CI và IaC scan đã được cấu hình ở Phase D; Phase G PR đã qua CI theo kết quả được báo cáo. Phase H cần CI trên PR mới; OIDC và CodeQL/default secret scanning vẫn cần triển khai hoặc bật trong GitHub Settings.
 - Terraform full profile gồm tài nguyên có chi phí như VPN Gateway, VM, SQL, Private Endpoint và Log Analytics.
 - Chưa có kết quả đối chiếu live với Azure Policy/Prowler; chưa claim coverage theo một CIS control cụ thể.
 

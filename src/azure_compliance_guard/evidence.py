@@ -16,6 +16,7 @@ class EvidenceError(ValueError):
 
 SCHEMA_VERSION = 1
 MAX_LINE_BYTES = 65_536
+MAX_EVIDENCE_BYTES = 32 * 1024 * 1024
 EVENT_TYPES = frozenset(
     {
         "RUN_STARTED",
@@ -135,6 +136,8 @@ def make_event(
 
 def read_events(path: Path) -> list[dict]:
     events = []
+    if Path(path).stat().st_size > MAX_EVIDENCE_BYTES:
+        raise EvidenceError("evidence file exceeds size limit")
     with Path(path).open("rb") as stream:
         for number, raw in enumerate(stream, start=1):
             try:
@@ -163,6 +166,9 @@ def append_events(path: Path, events: list[dict]) -> None:
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     with _append_lock:
+        existing_bytes = target.stat().st_size if target.exists() else 0
+        if existing_bytes + sum(map(len, lines)) > MAX_EVIDENCE_BYTES:
+            raise EvidenceError("evidence file exceeds size limit")
         if target.exists():
             read_events(target)
         flags = os.O_WRONLY | os.O_CREAT | os.O_APPEND | getattr(os, "O_BINARY", 0)

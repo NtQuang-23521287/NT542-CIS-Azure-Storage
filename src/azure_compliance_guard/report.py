@@ -178,6 +178,7 @@ def public_events(events: list[dict]) -> list[dict]:
                 else "Not recorded",
             }
         mode = event["source"].get("mode")
+        collector = event["source"].get("collector")
         projected.append(
             {
                 "event_id": _label(event["event_id"], "event"),
@@ -190,6 +191,11 @@ def public_events(events: list[dict]) -> list[dict]:
                 else "azure"
                 if mode == "azure"
                 else "unknown",
+                "collector": "Simulated lifecycle"
+                if collector == "simulated_lifecycle"
+                else "Fixture validation"
+                if collector == "validation_fixture"
+                else "Scan",
                 "data": _public_data(event["event_type"], event["data"]),
             }
         )
@@ -327,6 +333,8 @@ def render_report(events: list[dict]) -> str:
         loader=PackageLoader("azure_compliance_guard", "templates"),
         autoescape=True,
         undefined=StrictUndefined,
+        trim_blocks=True,
+        lstrip_blocks=True,
     )
     source = environment.loader.get_source(environment, "report.html.j2")[0]
     script = re.search(r"<script>(.*?)</script>", source, re.S)
