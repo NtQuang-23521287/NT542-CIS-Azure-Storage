@@ -456,6 +456,7 @@ class ExceptionRepository:
     def verify_chain(self) -> int:
         db = self._open()
         try:
+            db.execute("BEGIN")
             return self._verify_chain(db)
         except sqlite3.Error as exc:
             raise ExceptionStoreError("exception database read failed") from exc

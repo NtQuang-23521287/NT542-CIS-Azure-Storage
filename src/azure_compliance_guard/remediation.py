@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
+from azure_compliance_guard.exceptions import ExceptionRepository, ExceptionStoreError
 from azure_compliance_guard.models import Finding, ResourceState
 from azure_compliance_guard.rules import SERVICE_HANDLERS, Rule, RuleCatalog
 from azure_compliance_guard.scan import evaluate_states
@@ -260,36 +261,40 @@ def read_approval(payload: object) -> Approval:
     return Approval(**payload)
 
 
-def has_active_exception_file(
+def exception_resource_id(plan: RemediationPlan) -> str:
+    """Build the ARM identity used by the exception repository."""
+    resource = plan.resource
+    provider = {
+        "storage": "Microsoft.Storage/storageAccounts",
+        "key_vault": "Microsoft.KeyVault/vaults",
+        "sql": "Microsoft.Sql/servers",
+    }.get(resource.get("service"))
+    if provider is None:
+        raise InvalidPlanError("unsupported exception resource service")
+    subscription = resource.get("subscription_id")
+    if subscription is None and plan.source == "fixture":
+        subscription = "fixture"
+    group = resource.get("resource_group")
+    name = resource.get("name")
+    if not all(
+        isinstance(value, str) and value for value in (subscription, group, name)
+    ):
+        raise InvalidPlanError("incomplete exception resource identity")
+    return (
+        f"/subscriptions/{subscription}/resourceGroups/{group}"
+        f"/providers/{provider}/{name}"
+    ).lower()
+
+
+def has_active_exception_db(
     plan: RemediationPlan, path: Path, *, now: datetime | None = None
 ) -> bool:
-    """Read the legacy exception store strictly; Phase G will replace it."""
-    if path.stat().st_size > 1_048_576:
-        raise InvalidPlanError("exception store exceeds 1 MiB")
-    try:
-        entries = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        raise InvalidPlanError("invalid exception store JSON") from exc
-    if not isinstance(entries, list):
-        raise InvalidPlanError("exception store must be a list")
-    current = (now or datetime.now(UTC)).astimezone(UTC)
-    for entry in entries:
-        if not isinstance(entry, dict) or not isinstance(entry.get("status"), str):
-            raise InvalidPlanError("invalid exception entry")
-        if entry["status"] != "active":
-            continue
-        try:
-            expiry = datetime.fromisoformat(entry["expires_at"].replace("Z", "+00:00"))
-            if expiry.tzinfo is None or not isinstance(entry.get("resource_name"), str):
-                raise ValueError("invalid active exception")
-        except (KeyError, AttributeError, ValueError) as exc:
-            raise InvalidPlanError("invalid active exception") from exc
-        if (
-            entry["resource_name"].lower() == plan.resource["name"].lower()
-            and expiry > current
-        ):
-            return True
-    return False
+    """Read verified SQLite state; unavailable or altered state raises."""
+    if Path(path).with_suffix(".json").exists():
+        raise ExceptionStoreError("legacy JSON exceptions require explicit review")
+    return ExceptionRepository(path).has_active(
+        exception_resource_id(plan), plan.rule_id, now=now
+    )
 
 
 @dataclass(frozen=True, slots=True)

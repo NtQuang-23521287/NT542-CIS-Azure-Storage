@@ -139,7 +139,7 @@ acg remediation apply --plan $planPath --dry-run
 
 `--finding` nhận `finding_id` từ kết quả `acg scan --format json`, hoặc rule ID nếu chỉ có một finding khớp; thêm `--resource` để chọn tài nguyên khi cần. Plan và approval là JSON riêng, không ghi đè file có sẵn. Plan từ fixture không thể được thực thi trên Azure.
 
-Đường thực thi lab dùng plan tạo từ `--source azure`, `--execute`, approval file, `ALLOW_AZURE_MUTATIONS=true`, và `--exceptions` trỏ tới file JSON exception đã review (có thể là `[]`). Trước mutation, CLI xác nhận subscription, rule, handler, plan hash, hạn dùng, approval, exception và toàn bộ trạng thái before. Storage dùng management SDK; Key Vault và SQL dùng Azure CLI với argument vector, subscription cố định và timeout. Sau khi Azure nhận update, trạng thái chỉ thành `VERIFIED` nếu collector đọc lại và cùng rule trả PASS. Xem [trạng thái Phase F](docs/phase-f-status.md) về action được phép và giới hạn hiện tại.
+Live lab execution requires an Azure plan, exact approval, `ALLOW_AZURE_MUTATIONS=true`, and `--exceptions-db` pointing to an initialized SQLite database. The CLI checks the subscription, rule, handler, plan hash, expiry, approval, active exceptions and full before state before mutation. See [Phase F status](docs/phase-f-status.md) and [Phase G status](docs/phase-g-status.md) for the current boundaries.
 
 ## Jumpbox SSH key
 
@@ -196,7 +196,7 @@ Không commit `.env`, Terraform state, `*.tfvars`, log, database hoặc private 
 
 ## Known limitations
 
-- CLI mới có `doctor`, `scan`, `watch` và remediation Phase F; incident, exception governance và evidence còn ở các phase sau.
+- The CLI provides `doctor`, `scan`, `watch`, Phase F remediation, and Phase G SQLite exception governance. Evidence work remains in later phases.
 - Storage, Key Vault và SQL đã có 17 rule YAML schema-v1; mapping CIS/Azure Policy/Prowler vẫn chưa được xác minh bằng nguồn pinned và lab live.
 - Approval file Phase F là xác nhận cục bộ tự khai báo, chưa có xác thực danh tính hoặc chữ ký số. Chưa có rollback hay ledger bền vững chống chạy lặp sau lỗi không rõ kết quả.
 - Incident detection vẫn dựa trên fixture local, chưa phải Azure Monitor/KQL.

@@ -2,6 +2,7 @@
 
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import closing
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -160,7 +161,7 @@ def test_expire_revoke_and_incident_revoke_write_distinct_events(tmp_path):
         now=NOW,
     )
     assert repo.verify_chain() == 9
-    with sqlite3.connect(repo.path) as db:
+    with closing(sqlite3.connect(repo.path)) as db:
         kinds = [
             row[0] for row in db.execute("SELECT event_type FROM exception_events")
         ]
@@ -185,14 +186,16 @@ def test_hash_verifier_detects_event_and_state_tampering(tmp_path):
     )
     assert repo.verify_chain() == 2
 
-    with sqlite3.connect(repo.path) as db:
+    with closing(sqlite3.connect(repo.path)) as db:
         db.execute("UPDATE exception_events SET actor = 'forged' WHERE event_id = 1")
+        db.commit()
     with pytest.raises(ExceptionStoreError, match="hash chain"):
         repo.verify_chain()
 
-    with sqlite3.connect(repo.path) as db:
+    with closing(sqlite3.connect(repo.path)) as db:
         db.execute("UPDATE exception_events SET actor = 'student' WHERE event_id = 1")
         db.execute("UPDATE exceptions SET reason = 'forged' WHERE id = ?", (active.id,))
+        db.commit()
     with pytest.raises(ExceptionStoreError, match="state does not match"):
         repo.verify_chain()
     with pytest.raises(ExceptionStoreError, match="state does not match"):
@@ -225,6 +228,21 @@ def test_concurrent_activation_has_one_winner(tmp_path):
     assert sorted(results) == ["ACTIVE", "CONFLICT"]
     assert len(repo.list(status="ACTIVE")) == 1
     assert repo.verify_chain() == 3
+
+
+def test_concurrent_requests_do_not_overwrite_each_other(tmp_path):
+    repo = ExceptionRepository(tmp_path / "exceptions.sqlite3", timeout=5)
+    repo.initialize()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        records = list(pool.map(lambda n: request(repo, ticket=f"LAB-{n}"), (1, 2)))
+
+    assert len({record.id for record in records}) == 2
+    assert {record.ticket for record in repo.list(status="REQUESTED")} == {
+        "LAB-1",
+        "LAB-2",
+    }
+    assert repo.verify_chain() == 2
 
 
 def test_concurrent_revoke_and_expire_cannot_overwrite_each_other(tmp_path):
@@ -261,7 +279,7 @@ def test_concurrent_revoke_and_expire_cannot_overwrite_each_other(tmp_path):
 def test_locked_database_is_an_operational_error(tmp_path):
     repo = ExceptionRepository(tmp_path / "exceptions.sqlite3", timeout=0)
     repo.initialize()
-    with sqlite3.connect(repo.path, autocommit=True) as blocker:
+    with closing(sqlite3.connect(repo.path, autocommit=True)) as blocker:
         blocker.execute("BEGIN IMMEDIATE")
         with pytest.raises(ExceptionStoreError):
             request(repo)

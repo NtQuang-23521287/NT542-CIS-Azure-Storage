@@ -25,7 +25,7 @@ from azure_compliance_guard.remediation import (
     apply_plan,
     approve_plan,
     create_plan,
-    has_active_exception_file,
+    has_active_exception_db,
     read_approval,
     read_plan,
 )
@@ -107,7 +107,9 @@ def build_parser() -> argparse.ArgumentParser:
     apply = remediation_commands.add_parser("apply", help="dry-run or execute one plan")
     apply.add_argument("--plan", required=True, type=Path)
     apply.add_argument("--approval", type=Path)
-    apply.add_argument("--exceptions", type=Path, help="reviewed local exception store")
+    apply.add_argument(
+        "--exceptions-db", type=Path, help="reviewed SQLite exception store"
+    )
     apply.add_argument("--rules", type=Path)
     mode = apply.add_mutually_exclusive_group(required=True)
     mode.add_argument("--dry-run", action="store_true")
@@ -407,8 +409,8 @@ def _run_remediation_apply(args: argparse.Namespace) -> int:
             )
         if args.approval is None:
             raise InvalidPlanError("--approval is required for execution")
-        if args.exceptions is None:
-            raise InvalidPlanError("--exceptions is required for execution")
+        if args.exceptions_db is None:
+            raise InvalidPlanError("--exceptions-db is required for execution")
         if plan.resource.get("subscription_id") != os.getenv("AZURE_SUBSCRIPTION_ID"):
             raise InvalidPlanError(
                 "plan subscription does not match current configuration"
@@ -459,8 +461,8 @@ def _run_remediation_apply(args: argparse.Namespace) -> int:
             catalog=catalog,
             collect=collect,
             execute=executor.execute,
-            has_active_exception=lambda current: has_active_exception_file(
-                current, args.exceptions
+            has_active_exception=lambda current: has_active_exception_db(
+                current, args.exceptions_db
             ),
         )
     print(json.dumps(result.to_dict()))

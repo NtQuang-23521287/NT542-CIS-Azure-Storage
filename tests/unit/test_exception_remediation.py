@@ -1,4 +1,3 @@
-import json
 from datetime import UTC, datetime, timedelta
 
 import exception_manager
@@ -7,64 +6,62 @@ import incident_response
 import pytest
 import remediation
 
+from azure_compliance_guard.exceptions import ExceptionRepository, ExceptionStoreError
+
 
 @pytest.fixture
 def exception_store(tmp_path, monkeypatch):
-    path = tmp_path / "exceptions.json"
+    path = tmp_path / "exceptions.sqlite3"
     now = datetime(2030, 1, 1, tzinfo=UTC)
-    monkeypatch.setattr(exception_manager, "EXCEPTIONS_FILE", str(path))
+    monkeypatch.setattr(exception_manager, "EXCEPTIONS_DB", str(path))
+    monkeypatch.setattr(
+        exception_manager, "EXCEPTIONS_FILE", str(tmp_path / "exceptions.json")
+    )
     monkeypatch.setattr(exception_manager, "_now", lambda: now)
-    monkeypatch.setattr(exception_manager, "log_exception_event", lambda *args: None)
+    ExceptionRepository(path).initialize()
     return path, now
 
 
 def test_active_exception_is_found_and_expired_exception_is_not(exception_store):
     path, now = exception_store
-    active = {
-        "id": "exc-active",
-        "resource_name": "storage-demo",
-        "issue_name": "TLS drift",
-        "status": "active",
-        "expires_at": (now + timedelta(minutes=15)).isoformat(),
-    }
-    expired = {
-        "id": "exc-expired",
-        "resource_name": "storage-demo",
-        "issue_name": "PNA drift",
-        "status": "active",
-        "expires_at": (now - timedelta(minutes=1)).isoformat(),
-    }
-    path.write_text(json.dumps([active, expired]), encoding="utf-8")
+    requested = exception_manager.create_exception(
+        "storage",
+        "storage-demo",
+        "TLS drift",
+        15,
+        "lab",
+        owner="student",
+        ticket="LAB-1",
+    )
+    assert requested["status"] == "requested"
+    assert exception_manager.find_active_exception("storage-demo", "TLS drift") is None
+    ExceptionRepository(path).activate(
+        requested["id"], approved_by="reviewer", expected_version=1, now=now
+    )
 
     assert (
         exception_manager.find_active_exception("storage-demo", "TLS drift")["id"]
-        == "exc-active"
+        == requested["id"]
     )
     assert exception_manager.find_active_exception("storage-demo", "PNA drift") is None
-    assert [
-        item["status"] for item in json.loads(path.read_text(encoding="utf-8"))
-    ] == [
-        "active",
-        "expired",
+    assert [item["status"] for item in exception_manager.load_exceptions()] == [
+        "active"
     ]
 
 
 def test_revoking_active_exception_records_reason(exception_store):
     path, now = exception_store
-    path.write_text(
-        json.dumps(
-            [
-                {
-                    "id": "exc-1",
-                    "resource_type": "storage",
-                    "resource_name": "storage-demo",
-                    "issue_name": "TLS drift",
-                    "status": "active",
-                    "expires_at": (now + timedelta(minutes=15)).isoformat(),
-                }
-            ]
-        ),
-        encoding="utf-8",
+    requested = exception_manager.create_exception(
+        "storage",
+        "storage-demo",
+        "TLS drift",
+        15,
+        "lab",
+        owner="student",
+        ticket="LAB-1",
+    )
+    ExceptionRepository(path).activate(
+        requested["id"], approved_by="reviewer", expected_version=1, now=now
     )
 
     revoked = exception_manager.revoke_active_exceptions_for_resource(
@@ -75,6 +72,39 @@ def test_revoking_active_exception_records_reason(exception_store):
     assert revoked[0]["status"] == "revoked"
     assert revoked[0]["revoked_reason"] == "incident"
     assert exception_manager.find_active_exception_for_resource("storage-demo") is None
+    assert ExceptionRepository(path).verify_chain() == 3
+
+
+def test_legacy_json_requires_review_and_missing_db_fails_closed(exception_store):
+    path, _ = exception_store
+    legacy = path.with_suffix(".json")
+    legacy.write_text("[]", encoding="utf-8")
+    with pytest.raises(ExceptionStoreError, match="legacy JSON"):
+        exception_manager.load_exceptions()
+    legacy.unlink()
+    path.unlink()
+    with pytest.raises(ExceptionStoreError, match="unavailable"):
+        exception_manager.find_active_exception_for_resource("storage-demo")
+
+
+def test_legacy_refresh_expires_active_request_with_audit(exception_store, monkeypatch):
+    path, now = exception_store
+    requested = exception_manager.create_exception(
+        "storage",
+        "storage-demo",
+        "TLS drift",
+        15,
+        "lab",
+        owner="student",
+        ticket="LAB-1",
+    )
+    repo = ExceptionRepository(path)
+    repo.activate(requested["id"], approved_by="reviewer", expected_version=1, now=now)
+    monkeypatch.setattr(exception_manager, "_now", lambda: now + timedelta(minutes=16))
+
+    assert exception_manager.find_active_exception("storage-demo", "TLS drift") is None
+    assert repo.get(requested["id"]).status == "EXPIRED"
+    assert repo.verify_chain() == 3
 
 
 def test_sensitive_successful_access_escalates_with_evidence():
