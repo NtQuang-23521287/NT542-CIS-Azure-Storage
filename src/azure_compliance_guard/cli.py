@@ -19,7 +19,7 @@ from azure_compliance_guard.collectors import (
     FixtureStorageCollector,
 )
 from azure_compliance_guard.doctor import collect_doctor_checks
-from azure_compliance_guard.evidence import append_events, make_event
+from azure_compliance_guard.evidence import append_events, make_event, read_events
 from azure_compliance_guard.exceptions import ExceptionRepository
 from azure_compliance_guard.remediation import (
     AzureExecutor,
@@ -31,6 +31,7 @@ from azure_compliance_guard.remediation import (
     read_approval,
     read_plan,
 )
+from azure_compliance_guard.report import render_report
 from azure_compliance_guard.rules import (
     InvalidRuleSetError,
     load_default_rule_catalog,
@@ -86,6 +87,13 @@ def build_parser() -> argparse.ArgumentParser:
     _add_scan_arguments(scan, allow_fixture_path=True)
     scan.add_argument("--format", choices=("text", "json"), default="text")
     scan.add_argument("--output", type=Path, help="append schema-v1 JSONL evidence")
+
+    report = subparsers.add_parser("report", help="render a public offline HTML report")
+    report.add_argument("--input", required=True, type=Path)
+    report.add_argument("--output", required=True, type=Path)
+    report.add_argument(
+        "--redact", action="store_true", help="public redaction (always enabled)"
+    )
 
     watch = subparsers.add_parser("watch", help="run compliance scans repeatedly")
     _add_scan_arguments(watch)
@@ -616,6 +624,15 @@ def _run_exception(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _run_report(args: argparse.Namespace) -> int:
+    html = render_report(read_events(args.input))
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with args.output.open("x", encoding="utf-8") as stream:
+        stream.write(html)
+    print(f"Created {args.output}")
+    return EXIT_OK
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -625,6 +642,8 @@ def main(argv: list[str] | None = None) -> int:
             return _run_watch(args)
         if args.command == "exception":
             return _run_exception(args)
+        if args.command == "report":
+            return _run_report(args)
         if args.command == "remediation":
             if args.remediation_command == "plan":
                 return _run_remediation_plan(args)

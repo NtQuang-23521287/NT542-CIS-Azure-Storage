@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'none'; img-src data:; base-uri 'none'; form-action 'none'">
+  <title>ACG Evidence Report</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0c151c; --panel:#14242d; --line:#29404a; --text:#eaf4f3; --muted:#a4b8bc; --accent:#71d4bc; --amber:#f3c97d; --red:#f08c83; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }
+    a { color:var(--accent); }
+    .shell { max-width:1320px; margin:auto; padding:0 24px 64px; }
+    header { border-bottom:1px solid var(--line); padding:30px 0 24px; }
+    .eyebrow { color:var(--accent); font-size:.75rem; font-weight:750; letter-spacing:.17em; text-transform:uppercase; }
+    h1 { margin:.25rem 0 .4rem; font-size:clamp(1.8rem,3vw,2.7rem); letter-spacing:-.04em; line-height:1.1; }
+    h2 { margin:0 0 16px; font-size:1.22rem; letter-spacing:-.02em; }
+    h3 { margin:0; font-size:1rem; }
+    p { margin:.35rem 0; }
+    .subtitle,.muted { color:var(--muted); }
+    .meta { display:flex; flex-wrap:wrap; gap:8px 20px; color:var(--muted); font-size:.85rem; margin-top:16px; }
+    main { display:grid; gap:28px; padding-top:28px; }
+    .section-heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .section-heading p { font-size:.82rem; color:var(--muted); }
+    .cards { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px; min-height:112px; }
+    .card .label { display:block; color:var(--muted); font-size:.77rem; text-transform:uppercase; letter-spacing:.08em; }
+    .card strong { display:block; margin-top:10px; font-size:1.85rem; font-variant-numeric:tabular-nums; line-height:1; }
+    .card.primary { border-color:#438b80; }
+    .card.primary strong { color:var(--accent); }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+    .table-scroll { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; text-align:left; }
+    th,td { padding:12px 14px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { color:var(--muted); font-size:.74rem; letter-spacing:.07em; text-transform:uppercase; white-space:nowrap; }
+    tbody tr:last-child td { border-bottom:0; }
+    .rule { color:var(--accent); font-weight:700; white-space:nowrap; }
+    .resource { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.83rem; overflow-wrap:anywhere; }
+    .badge { display:inline-block; padding:2px 8px; border:1px solid currentColor; border-radius:4px; font-size:.75rem; font-weight:700; white-space:nowrap; }
+    .badge.CRITICAL,.badge.ESCALATED_CRITICAL { color:var(--red); }
+    .badge.WARNING { color:var(--amber); }
+    .timeline { list-style:none; padding:4px 20px 8px; margin:0; }
+    .timeline li { border-left:2px solid var(--line); padding:10px 0 14px 20px; position:relative; }
+    .timeline li::before { content:""; position:absolute; width:8px; height:8px; border-radius:50%; background:var(--accent); left:-5px; top:18px; }
+    .timeline time { display:block; color:var(--muted); font-size:.77rem; }
+    .timeline .event { font-weight:700; }
+    .timeline .detail { color:var(--muted); font-size:.83rem; }
+    .note { border-left:3px solid var(--amber); padding:10px 14px; background:#2a2a25; color:#f7e4c4; }
+    .empty { color:var(--muted); padding:20px; }
+    footer { border-top:1px solid var(--line); margin-top:32px; padding-top:20px; color:var(--muted); font-size:.82rem; }
+    @media (max-width:900px) { .cards { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width:560px) { .shell { padding-left:16px; padding-right:16px; } .cards { grid-template-columns:repeat(2,minmax(0,1fr)); } .card { padding:14px; min-height:102px; } .card strong { font-size:1.5rem; } .section-heading { display:block; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="eyebrow">Azure Compliance Guard / Evidence</div>
+      <h1>Compliance snapshot</h1>
+      <p class="subtitle">Static, offline report from append-only local evidence.</p>
+      <div class="meta"><span>{{ source_label }}</span><span>Generated {{ generated_at }}</span><span>Public identifiers are pseudonymized</span></div>
+    </header>
+    <main>
+      <section aria-labelledby="overview-title">
+        <div class="section-heading"><h2 id="overview-title">Overview</h2><p>Compliance is evaluated rules without findings / all evaluated rules.</p></div>
+        <div class="cards">
+          <div class="card primary"><span class="label">Compliance</span><strong>{{ summary.compliance }}</strong></div>
+          <div class="card"><span class="label">PASS</span><strong>{{ summary.pass }}</strong></div>
+          <div class="card"><span class="label">WARNING</span><strong>{{ summary.warning }}</strong></div>
+          <div class="card"><span class="label">CRITICAL</span><strong>{{ summary.critical }}</strong></div>
+          <div class="card"><span class="label">Resources scanned</span><strong>{{ summary.resources }}</strong></div>
+          <div class="card"><span class="label">Rules evaluated</span><strong>{{ summary.rules }}</strong></div>
+          <div class="card"><span class="label">Scan duration</span><strong>{{ summary.duration_ms }}<small> ms</small></strong></div>
+          <div class="card"><span class="label">Findings</span><strong>{{ findings|length }}</strong></div>
+        </div>
+      </section>
+      <section aria-labelledby="findings-title">
+        <div class="section-heading"><h2 id="findings-title">Findings</h2><p>Observed drift from evaluated rules</p></div>
+        <div class="panel table-scroll">
+          {% if findings %}
+          <table><thead><tr><th scope="col">Rule / title</th><th scope="col">Service</th><th scope="col">Severity / status</th><th scope="col">Resource</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Exception</th><th scope="col">Remediation</th></tr></thead><tbody>
+            {% for event in findings %}
+            <tr><td><span class="rule">{{ event.data.rule_id }}</span><br>{{ event.data.title }}</td><td>{{ event.resource.service }}</td><td><span class="badge {{ event.data.severity }}">{{ event.data.severity }}</span><br>{{ event.data.status }}</td><td class="resource">{{ event.resource.name }}</td><td>{{ event.data.expected }}</td><td>{{ event.data.actual }}</td><td>None recorded</td><td>None recorded</td></tr>
+            {% endfor %}
+          </tbody></table>
+          {% else %}<p class="empty">No findings were recorded in this evidence stream.</p>{% endif %}
+        </div>
+      </section>
+      <section aria-labelledby="timeline-title">
+        <div class="section-heading"><h2 id="timeline-title">Timeline</h2><p>Events in timestamp order</p></div>
+        <div class="panel"><ol class="timeline">
+          {% for event in timeline %}
+          <li><time datetime="{{ event.timestamp }}">{{ event.timestamp }}</time><div class="event">{{ event.event_type|replace('_', ' ') }}</div><div class="detail">{{ event.source }}{% if event.resource %} · {{ event.resource.name }}{% endif %}</div></li>
+          {% endfor %}
+        </ol></div>
+      </section>
+      <section aria-labelledby="validation-title">
+        <div class="section-heading"><h2 id="validation-title">External validation</h2><p>Detection credibility is separate from remediation lifecycle.</p></div>
+        <div class="note"><strong>UNVERIFIED</strong> — No Prowler or Azure Policy comparison evidence is present in this report. Fixture-only results do not establish live accuracy or exact control mapping.</div>
+      </section>
+    </main>
+    <footer>Azure Compliance Guard · Offline evidence report · No Azure account or web server required</footer>
+  </div>
+</body>
+</html>
