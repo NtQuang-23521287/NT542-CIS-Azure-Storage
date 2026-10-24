@@ -1,0 +1,111 @@
+{
+  "resource_group": "rg-acg-demo",
+  "storage_accounts": [
+    {
+      "name": "stsecurecase",
+      "account": {
+        "supportsHttpsTrafficOnly": true,
+        "minimumTlsVersion": "TLS1_2",
+        "publicNetworkAccess": "Disabled"
+      },
+      "blob_service": {
+        "isVersioningEnabled": true
+      }
+    },
+    {
+      "name": "stdriftcase",
+      "account": {
+        "supportsHttpsTrafficOnly": false,
+        "minimumTlsVersion": "TLS1_0",
+        "publicNetworkAccess": "Enabled"
+      },
+      "blob_service": {
+        "isVersioningEnabled": false
+      }
+    }
+  ],
+  "key_vaults": [
+    {
+      "name": "kv-secure",
+      "properties": {
+        "publicNetworkAccess": "Disabled",
+        "enableRbacAuthorization": true,
+        "enablePurgeProtection": true,
+        "enableSoftDelete": true
+      },
+      "private_endpoint_enabled": true,
+      "keys": [
+        {
+          "attributes": {
+            "expires": "2027-01-01T00:00:00Z"
+          }
+        }
+      ],
+      "secrets": [
+        {
+          "attributes": {
+            "expires": "2027-01-01T00:00:00Z"
+          }
+        }
+      ]
+    },
+    {
+      "name": "kv-drift",
+      "properties": {
+        "publicNetworkAccess": "Enabled",
+        "enableRbacAuthorization": false,
+        "enablePurgeProtection": false,
+        "enableSoftDelete": false
+      },
+      "private_endpoint_enabled": false,
+      "keys": [
+        {
+          "attributes": {
+            "expires": null
+          }
+        }
+      ],
+      "secrets": [
+        {
+          "attributes": {}
+        }
+      ]
+    }
+  ],
+  "sql_servers": [
+    {
+      "name": "sql-secure",
+      "server": {
+        "minimalTlsVersion": "1.2",
+        "publicNetworkAccess": "Disabled"
+      },
+      "auditing": {
+        "state": "Enabled"
+      },
+      "defender": {
+        "pricingTier": "Standard"
+      },
+      "private_endpoint_enabled": true,
+      "ad_admins": [
+        {
+          "login": "admin-validation"
+        }
+      ]
+    },
+    {
+      "name": "sql-drift",
+      "server": {
+        "minimalTlsVersion": "1.0",
+        "publicNetworkAccess": "Enabled"
+      },
+      "auditing": {
+        "state": "Disabled"
+      },
+      "defender": {
+        "pricingTier": "Free"
+      },
+      "private_endpoint_enabled": false,
+      "ad_admins": []
+    }
+  ]
+}

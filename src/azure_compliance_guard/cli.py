@@ -7,6 +7,7 @@ import time
 from datetime import UTC, datetime, timedelta
 from importlib.resources import as_file, files
 from pathlib import Path
+from uuid import uuid4
 
 from azure_compliance_guard.azure_cli import AzureCliJsonRunner
 from azure_compliance_guard.collectors import (
@@ -18,6 +19,7 @@ from azure_compliance_guard.collectors import (
     FixtureStorageCollector,
 )
 from azure_compliance_guard.doctor import collect_doctor_checks
+from azure_compliance_guard.evidence import append_events, make_event
 from azure_compliance_guard.exceptions import ExceptionRepository
 from azure_compliance_guard.remediation import (
     AzureExecutor,
@@ -56,12 +58,18 @@ def _positive_int(value: str) -> int:
     return parsed
 
 
-def _add_scan_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--source", choices=("azure", "fixture"), default="azure")
+def _add_scan_arguments(
+    parser: argparse.ArgumentParser, *, allow_fixture_path: bool = False
+) -> None:
+    parser.add_argument(
+        "--source",
+        choices=None if allow_fixture_path else ("azure", "fixture"),
+        default="azure",
+    )
     parser.add_argument(
         "--service",
         choices=("storage", "key-vault", "sql", "all"),
-        default="storage",
+        default=None if allow_fixture_path else "storage",
     )
     parser.add_argument("--fixture", type=Path)
     parser.add_argument("--rules", type=Path)
@@ -75,8 +83,9 @@ def build_parser() -> argparse.ArgumentParser:
     doctor.add_argument("--format", choices=("text", "json"), default="text")
 
     scan = subparsers.add_parser("scan", help="run one compliance scan and exit")
-    _add_scan_arguments(scan)
+    _add_scan_arguments(scan, allow_fixture_path=True)
     scan.add_argument("--format", choices=("text", "json"), default="text")
+    scan.add_argument("--output", type=Path, help="append schema-v1 JSONL evidence")
 
     watch = subparsers.add_parser("watch", help="run compliance scans repeatedly")
     _add_scan_arguments(watch)
@@ -283,10 +292,19 @@ def _collect_scan(args: argparse.Namespace):
     catalog = (
         load_rule_catalog(args.rules) if args.rules else load_default_rule_catalog()
     )
-    if args.source == "fixture":
-        states = _fixture_states(args.fixture, args.service)
+    if args.source == "azure":
+        states = _azure_states(args.service or "storage")
+    elif args.source == "fixture":
+        states = _fixture_states(args.fixture, args.service or "storage")
+    elif args.command == "scan":
+        path = Path(args.source)
+        if path.suffix.lower() != ".json" or not path.is_file():
+            raise InvalidRuleSetError(
+                "--source must be azure, fixture, or an existing JSON fixture"
+            )
+        states = _fixture_states(path, args.service or "all")
     else:
-        states = _azure_states(args.service)
+        raise InvalidRuleSetError("invalid scan source")
     findings = evaluate_states(states, catalog)
     return states, findings
 
@@ -314,7 +332,91 @@ def _emit_text(states, findings) -> None:
 
 
 def _run_scan(args: argparse.Namespace) -> int:
-    states, findings = _collect_scan(args)
+    run_id = str(uuid4())
+    source = {
+        "mode": "azure" if args.source == "azure" else "fixture",
+        "collector": args.service
+        or ("all" if args.source not in {"azure", "fixture"} else "storage"),
+        "catalog_version": 1,
+    }
+    started_at = datetime.now(UTC)
+    started = time.perf_counter()
+    if args.output:
+        append_events(
+            args.output,
+            [
+                make_event(
+                    "RUN_STARTED",
+                    run_id=run_id,
+                    resource=None,
+                    source=source,
+                    data={},
+                    now=started_at,
+                )
+            ],
+        )
+    try:
+        states, findings = _collect_scan(args)
+    except Exception as exc:
+        if args.output:
+            append_events(
+                args.output,
+                [
+                    make_event(
+                        "RUN_COMPLETED",
+                        run_id=run_id,
+                        resource=None,
+                        source=source,
+                        data={
+                            "status": "ERROR",
+                            "error_type": type(exc).__name__,
+                            "duration_ms": round(
+                                (time.perf_counter() - started) * 1000
+                            ),
+                        },
+                    )
+                ],
+            )
+        raise
+    if args.output:
+        catalog = (
+            load_rule_catalog(args.rules) if args.rules else load_default_rule_catalog()
+        )
+        evaluated = sum(
+            rule.service == state.resource.service
+            for state in states
+            for rule in catalog.rules
+        )
+        events = [
+            make_event(
+                "FINDING",
+                run_id=run_id,
+                resource=finding.resource.to_dict(),
+                source=source,
+                data={
+                    key: value
+                    for key, value in finding.to_dict().items()
+                    if key != "resource"
+                },
+            )
+            for finding in findings
+        ]
+        events.append(
+            make_event(
+                "RUN_COMPLETED",
+                run_id=run_id,
+                resource=None,
+                source=source,
+                data={
+                    "status": "COMPLETED",
+                    "resources_scanned": len(states),
+                    "rules_evaluated": evaluated,
+                    "findings": len(findings),
+                    "duration_ms": round((time.perf_counter() - started) * 1000),
+                },
+            )
+        )
+        append_events(args.output, events)
     if args.format == "json":
         print(json.dumps(_scan_document(states, findings), indent=2))
     else:
