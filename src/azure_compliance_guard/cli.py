@@ -397,7 +397,11 @@ def _run_remediation_apply(args: argparse.Namespace) -> int:
             )
             executor = AzureExecutor(
                 storage_client=StorageManagementClient(
-                    credential, plan.resource["subscription_id"]
+                    credential,
+                    plan.resource["subscription_id"],
+                    connection_timeout=10,
+                    read_timeout=60,
+                    retry_total=2,
                 )
             )
         else:
