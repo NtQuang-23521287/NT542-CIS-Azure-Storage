@@ -5,6 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from azure_compliance_guard.collectors import FixtureStorageCollector
+from azure_compliance_guard.exceptions import ExceptionRepository, ExceptionStoreError
 from azure_compliance_guard.models import ResourceRef
 from azure_compliance_guard.remediation import (
     AzureExecutor,
@@ -12,7 +13,8 @@ from azure_compliance_guard.remediation import (
     apply_plan,
     approve_plan,
     create_plan,
-    has_active_exception_file,
+    exception_resource_id,
+    has_active_exception_db,
     read_plan,
 )
 from azure_compliance_guard.rules import load_default_rule_catalog
@@ -263,23 +265,39 @@ def test_fixture_plan_cannot_reach_azure_executor():
     client.storage_accounts.update.assert_not_called()
 
 
-def test_active_legacy_exception_blocks_resource_and_malformed_store_fails_closed(
+def test_active_sqlite_exception_blocks_exact_rule_and_unavailable_state_fails_closed(
     tmp_path,
 ):
     state, finding, rule = _storage_finding()
     now = datetime(2026, 10, 23, tzinfo=UTC)
     plan = create_plan(finding, state, rule, source="fixture", now=now)
-    store = tmp_path / "exceptions.json"
-    store.write_text(
-        '[{"status":"active","resource_name":"stintentionaldrift",'
-        '"expires_at":"2026-10-23T01:00:00+00:00"}]',
-        encoding="utf-8",
+    store = tmp_path / "exceptions.sqlite3"
+    repo = ExceptionRepository(store)
+    repo.initialize()
+    pending = repo.request(
+        resource_id=exception_resource_id(plan),
+        resource_name=plan.resource["name"],
+        rule_id=plan.rule_id,
+        owner="student",
+        reason="lab",
+        ticket="LAB-1",
+        expires_at=now + timedelta(minutes=30),
+        now=now,
+    )
+    assert has_active_exception_db(plan, store, now=now) is False
+    repo.activate(pending.id, approved_by="reviewer", expected_version=1, now=now)
+    assert has_active_exception_db(plan, store, now=now) is True
+    assert (
+        has_active_exception_db(plan, store, now=now + timedelta(minutes=31)) is False
     )
 
-    assert has_active_exception_file(plan, store, now=now) is True
-    store.write_text("{broken", encoding="utf-8")
-    with pytest.raises(InvalidPlanError, match="exception"):
-        has_active_exception_file(plan, store, now=now)
+    store.with_suffix(".json").write_text("[]", encoding="utf-8")
+    with pytest.raises(ExceptionStoreError, match="legacy JSON"):
+        has_active_exception_db(plan, store, now=now)
+    store.with_suffix(".json").unlink()
+    store.unlink()
+    with pytest.raises(ExceptionStoreError, match="unavailable"):
+        has_active_exception_db(plan, store, now=now)
 
 
 def test_changed_before_state_fails_plan_hash_check():

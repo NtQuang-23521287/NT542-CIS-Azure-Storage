@@ -24,6 +24,9 @@ htmlcov/
 *.db
 *.db-wal
 *.db-shm
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
 /Compliance/engine/logs/
 /Compliance/data/exceptions.json
 /Compliance/data/security_signals.json

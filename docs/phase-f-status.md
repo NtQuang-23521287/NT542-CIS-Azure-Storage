@@ -15,7 +15,7 @@ Azure remediation has been attempted or verified.
   hash. Approval records the plan ID, hash, approver label and timestamp.
 - Execution rejects expired, unapproved, changed, manual-only and stale plans.
   It checks the current rule, resource identity, full before state and a
-  reviewed local exception file before updating. An accepted update is
+  reviewed SQLite exception database before updating. An accepted update is
   re-collected and the same rule is evaluated with bounded retries.
 - Storage account HTTPS, TLS and public-network changes use the Storage
   management SDK. Key Vault public-network/RBAC and SQL TLS/public-network
@@ -39,8 +39,8 @@ Azure remediation has been attempted or verified.
 - Precondition re-collection narrows the check/use gap but cannot make Azure
   state updates atomic with the read. Live execution requires a dedicated,
   cost-reviewed lab and operator review of network/RBAC impact.
-- The local exception JSON check is fail-closed and intentionally temporary;
-  Phase G will replace it with transactional SQLite governance.
+- Phase G replaced the local exception JSON check with a transactional SQLite
+  lookup. Missing, corrupt, altered, or legacy JSON state blocks execution.
 
 `VERIFIED` means the same rule passed after re-collection. An Azure SDK or CLI
 success response alone never produces `VERIFIED`.

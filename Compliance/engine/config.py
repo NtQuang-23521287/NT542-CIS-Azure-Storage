@@ -46,6 +46,7 @@ DATA_DIR = os.getenv("DATA_DIR", str(COMPLIANCE_DIR / "data"))
 LOG_DIR = os.getenv("LOG_DIR", str(BASE_DIR / "logs"))
 
 EXCEPTIONS_FILE = os.getenv("EXCEPTIONS_FILE", str(Path(DATA_DIR) / "exceptions.json"))
+EXCEPTIONS_DB = os.getenv("EXCEPTIONS_DB", str(Path(DATA_DIR) / "exceptions.sqlite3"))
 SECURITY_SIGNALS_FILE = os.getenv(
     "SECURITY_SIGNALS_FILE",
     str(Path(DATA_DIR) / "security_signals.json"),

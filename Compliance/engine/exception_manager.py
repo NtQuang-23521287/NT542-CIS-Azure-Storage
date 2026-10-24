@@ -1,57 +1,56 @@
+"""Legacy monitor adapter for the SQLite exception repository.
+
+The local admin command creates requests only. Activation requires the
+separate reviewed `acg exception activate` command.
+"""
+
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from audit_logger import log_exception_event
-from config import EXCEPTIONS_FILE, MAX_EXCEPTION_MINUTES
+from config import EXCEPTIONS_DB, EXCEPTIONS_FILE, MAX_EXCEPTION_MINUTES
+
+from azure_compliance_guard.exceptions import (
+    ExceptionRepository,
+    ExceptionStoreError,
+    VersionConflict,
+)
 
 
 def _now() -> datetime:
     return datetime.now(UTC)
 
 
-def _parse_time(value: str) -> datetime:
-    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+def _repo() -> ExceptionRepository:
+    if Path(EXCEPTIONS_FILE).exists():
+        raise ExceptionStoreError("legacy JSON exceptions require explicit review")
+    return ExceptionRepository(Path(EXCEPTIONS_DB))
 
 
-def _format_time(value: datetime) -> str:
-    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
-
-
-def _load_all() -> list[dict]:
-    path = Path(EXCEPTIONS_FILE)
-    if not path.exists():
-        return []
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return []
-
-
-def _save_all(exceptions: list[dict]) -> None:
-    path = Path(EXCEPTIONS_FILE)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(exceptions, indent=2), encoding="utf-8")
-
-
-def _refresh_status(exception: dict, now: datetime | None = None) -> dict:
-    now = now or _now()
-    if (
-        exception.get("status") == "active"
-        and _parse_time(exception["expires_at"]) <= now
-    ):
-        exception["status"] = "expired"
-    return exception
+def _legacy_view(record) -> dict:
+    return {
+        **record.to_dict(),
+        "resource_type": record.resource_id.split(":", 2)[1]
+        if record.resource_id.startswith("legacy:")
+        else "unknown",
+        "issue_name": record.rule_id,
+        "status": record.status.lower(),
+        "revoked_reason": record.closed_reason if record.status == "REVOKED" else None,
+    }
 
 
 def load_exceptions(refresh: bool = True) -> list[dict]:
-    exceptions = _load_all()
+    repo = _repo()
     if refresh:
-        exceptions = [_refresh_status(item) for item in exceptions]
-        _save_all(exceptions)
-    return exceptions
+        now = _now()
+        for record in repo.list(status="ACTIVE"):
+            if datetime.fromisoformat(record.expires_at) <= now:
+                try:
+                    repo.expire(record.id, expected_version=record.version, now=now)
+                except VersionConflict:
+                    pass
+    return [_legacy_view(record) for record in repo.list()]
 
 
 def create_exception(
@@ -61,111 +60,88 @@ def create_exception(
     duration_minutes: int,
     reason: str,
     severity: str = "CRITICAL",
+    *,
+    owner: str,
+    ticket: str,
 ) -> dict:
-    if duration_minutes <= 0:
-        raise ValueError("Duration must be greater than 0 minutes.")
-    if duration_minutes > MAX_EXCEPTION_MINUTES:
-        raise ValueError(f"Duration cannot exceed {MAX_EXCEPTION_MINUTES} minutes.")
-
-    created_at = _now()
-    expires_at = created_at + timedelta(minutes=duration_minutes)
-    exceptions = load_exceptions()
-    exception = {
-        "id": f"exc-{created_at.strftime('%Y%m%d-%H%M%S')}-{len(exceptions) + 1:03d}",
-        "resource_type": resource_type,
-        "resource_name": resource_name,
-        "issue_name": issue_name,
-        "severity": severity,
-        "reason": reason,
-        "duration_minutes": duration_minutes,
-        "created_at": _format_time(created_at),
-        "expires_at": _format_time(expires_at),
-        "status": "active",
-    }
-    exceptions.append(exception)
-    _save_all(exceptions)
-    log_exception_event(
-        "EXCEPTION_CREATED",
-        {
-            "Id": exception["id"],
-            "Resource": f"{resource_type}/{resource_name}",
-            "Issue": issue_name,
-            "Duration": f"{duration_minutes} minutes",
-            "Expires": exception["expires_at"],
-            "Reason": reason,
-        },
+    if duration_minutes <= 0 or duration_minutes > MAX_EXCEPTION_MINUTES:
+        raise ValueError(
+            f"Duration must be between 1 and {MAX_EXCEPTION_MINUTES} minutes"
+        )
+    del severity  # Severity belongs to the finding, not the exception lifecycle.
+    now = _now()
+    record = _repo().request(
+        resource_id=f"legacy:{resource_type}:{resource_name}",
+        resource_name=resource_name,
+        rule_id=issue_name,
+        owner=owner,
+        reason=reason,
+        ticket=ticket,
+        expires_at=now + timedelta(minutes=duration_minutes),
+        now=now,
     )
-    return exception
+    return _legacy_view(record)
 
 
 def find_active_exception(resource_name: str, issue_name: str) -> dict | None:
     now = _now()
-    exceptions = load_exceptions()
-    for exception in exceptions:
-        if exception.get("status") != "active":
-            continue
-        if exception.get("resource_name") != resource_name:
-            continue
-        if exception.get("issue_name") != issue_name:
-            continue
-        if _parse_time(exception["expires_at"]) > now:
-            return exception
-    return None
+    return next(
+        (
+            item
+            for item in load_exceptions()
+            if item["status"] == "active"
+            and item["resource_name"] == resource_name
+            and item["issue_name"] == issue_name
+            and datetime.fromisoformat(item["expires_at"]) > now
+        ),
+        None,
+    )
 
 
 def find_active_exception_for_resource(resource_name: str) -> dict | None:
     now = _now()
-    exceptions = load_exceptions()
-    for exception in exceptions:
-        if exception.get("status") != "active":
-            continue
-        if exception.get("resource_name") != resource_name:
-            continue
-        if _parse_time(exception["expires_at"]) > now:
-            return exception
-    return None
+    return next(
+        (
+            item
+            for item in load_exceptions()
+            if item["status"] == "active"
+            and item["resource_name"] == resource_name
+            and datetime.fromisoformat(item["expires_at"]) > now
+        ),
+        None,
+    )
 
 
 def revoke_active_exceptions_for_resource(
     resource_name: str, reason: str
 ) -> list[dict]:
+    repo = _repo()
     now = _now()
     revoked = []
-    exceptions = load_exceptions()
-
-    for exception in exceptions:
-        if exception.get("status") != "active":
+    for record in repo.list(status="ACTIVE"):
+        if record.resource_name != resource_name:
             continue
-        if exception.get("resource_name") != resource_name:
+        if datetime.fromisoformat(record.expires_at) <= now:
+            try:
+                repo.expire(record.id, expected_version=record.version, now=now)
+            except VersionConflict:
+                pass
             continue
-        if _parse_time(exception["expires_at"]) <= now:
-            exception["status"] = "expired"
+        try:
+            closed = repo.revoke(
+                record.id,
+                actor="incident-handler",
+                reason=reason,
+                expected_version=record.version,
+                incident=True,
+                now=now,
+            )
+        except VersionConflict:
             continue
-
-        exception["status"] = "revoked"
-        exception["revoked_at"] = _format_time(now)
-        exception["revoked_reason"] = reason
-        exception["duration_minutes"] = 0
-        exception["expires_at"] = _format_time(now)
-        revoked.append(exception.copy())
-
-    _save_all(exceptions)
-
-    for exception in revoked:
-        log_exception_event(
-            "EXCEPTION_REVOKED",
-            {
-                "Id": exception["id"],
-                "Resource": f"{exception.get('resource_type', 'unknown')}/{resource_name}",
-                "Issue": exception.get("issue_name", "unknown"),
-                "Reason": reason,
-                "Revoked": exception["revoked_at"],
-            },
-        )
-
+        revoked.append(_legacy_view(closed))
     return revoked
 
 
 def remaining_minutes(exception: dict) -> int:
-    remaining = _parse_time(exception["expires_at"]) - _now()
+    remaining = datetime.fromisoformat(exception["expires_at"]) - _now()
     return max(0, int(remaining.total_seconds() // 60))

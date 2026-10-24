@@ -4,6 +4,7 @@ import math
 import os
 import sys
 import time
+from datetime import UTC, datetime, timedelta
 from importlib.resources import as_file, files
 from pathlib import Path
 
@@ -17,13 +18,14 @@ from azure_compliance_guard.collectors import (
     FixtureStorageCollector,
 )
 from azure_compliance_guard.doctor import collect_doctor_checks
+from azure_compliance_guard.exceptions import ExceptionRepository
 from azure_compliance_guard.remediation import (
     AzureExecutor,
     InvalidPlanError,
     apply_plan,
     approve_plan,
     create_plan,
-    has_active_exception_file,
+    has_active_exception_db,
     read_approval,
     read_plan,
 )
@@ -105,11 +107,56 @@ def build_parser() -> argparse.ArgumentParser:
     apply = remediation_commands.add_parser("apply", help="dry-run or execute one plan")
     apply.add_argument("--plan", required=True, type=Path)
     apply.add_argument("--approval", type=Path)
-    apply.add_argument("--exceptions", type=Path, help="reviewed local exception store")
+    apply.add_argument(
+        "--exceptions-db", type=Path, help="reviewed SQLite exception store"
+    )
     apply.add_argument("--rules", type=Path)
     mode = apply.add_mutually_exclusive_group(required=True)
     mode.add_argument("--dry-run", action="store_true")
     mode.add_argument("--execute", action="store_true")
+
+    exceptions = subparsers.add_parser("exception", help="govern SQLite exceptions")
+    exception_commands = exceptions.add_subparsers(
+        dest="exception_command", required=True
+    )
+    for name in (
+        "init",
+        "request",
+        "activate",
+        "expire",
+        "revoke",
+        "list",
+        "verify-chain",
+    ):
+        command = exception_commands.add_parser(name)
+        command.add_argument("--db", required=True, type=Path)
+        if name == "request":
+            for field in (
+                "resource-id",
+                "resource-name",
+                "rule-id",
+                "owner",
+                "reason",
+                "ticket",
+            ):
+                command.add_argument(f"--{field}", required=True)
+            command.add_argument("--minutes", type=_positive_int, required=True)
+        if name in {"activate", "expire", "revoke"}:
+            command.add_argument("--id", required=True)
+            command.add_argument(
+                "--expected-version", type=_positive_int, required=True
+            )
+        if name == "activate":
+            command.add_argument("--approved-by", required=True)
+        if name == "revoke":
+            command.add_argument("--actor", required=True)
+            command.add_argument("--reason", required=True)
+            command.add_argument("--incident", action="store_true")
+        if name == "list":
+            command.add_argument(
+                "--status", choices=("REQUESTED", "ACTIVE", "EXPIRED", "REVOKED")
+            )
+            command.add_argument("--resource-id")
     return parser
 
 
@@ -362,8 +409,8 @@ def _run_remediation_apply(args: argparse.Namespace) -> int:
             )
         if args.approval is None:
             raise InvalidPlanError("--approval is required for execution")
-        if args.exceptions is None:
-            raise InvalidPlanError("--exceptions is required for execution")
+        if args.exceptions_db is None:
+            raise InvalidPlanError("--exceptions-db is required for execution")
         if plan.resource.get("subscription_id") != os.getenv("AZURE_SUBSCRIPTION_ID"):
             raise InvalidPlanError(
                 "plan subscription does not match current configuration"
@@ -414,14 +461,57 @@ def _run_remediation_apply(args: argparse.Namespace) -> int:
             catalog=catalog,
             collect=collect,
             execute=executor.execute,
-            has_active_exception=lambda current: has_active_exception_file(
-                current, args.exceptions
+            has_active_exception=lambda current: has_active_exception_db(
+                current, args.exceptions_db
             ),
         )
     print(json.dumps(result.to_dict()))
     return (
         EXIT_OK if result.status in {"DRY_RUN", "VERIFIED"} else EXIT_OPERATIONAL_ERROR
     )
+
+
+def _run_exception(args: argparse.Namespace) -> int:
+    repo = ExceptionRepository(args.db)
+    command = args.exception_command
+    if command == "init":
+        repo.initialize()
+        result = {"database": str(args.db), "schema_version": 1}
+    elif command == "request":
+        result = repo.request(
+            resource_id=args.resource_id,
+            resource_name=args.resource_name,
+            rule_id=args.rule_id,
+            owner=args.owner,
+            reason=args.reason,
+            ticket=args.ticket,
+            expires_at=datetime.now(UTC) + timedelta(minutes=args.minutes),
+        ).to_dict()
+    elif command == "activate":
+        result = repo.activate(
+            args.id,
+            approved_by=args.approved_by,
+            expected_version=args.expected_version,
+        ).to_dict()
+    elif command == "expire":
+        result = repo.expire(args.id, expected_version=args.expected_version).to_dict()
+    elif command == "revoke":
+        result = repo.revoke(
+            args.id,
+            actor=args.actor,
+            reason=args.reason,
+            expected_version=args.expected_version,
+            incident=args.incident,
+        ).to_dict()
+    elif command == "list":
+        result = [
+            record.to_dict()
+            for record in repo.list(status=args.status, resource_id=args.resource_id)
+        ]
+    else:
+        result = {"events": repo.verify_chain(), "valid": True}
+    print(json.dumps(result, indent=2))
+    return EXIT_OK
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -431,6 +521,8 @@ def main(argv: list[str] | None = None) -> int:
             return _run_doctor(args.format)
         if args.command == "watch":
             return _run_watch(args)
+        if args.command == "exception":
+            return _run_exception(args)
         if args.command == "remediation":
             if args.remediation_command == "plan":
                 return _run_remediation_plan(args)

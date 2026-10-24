@@ -48,6 +48,8 @@ def _handle_exception(parts: list[str]) -> None:
         options, "duration_minutes", "duration_minutes"
     )
     reason = _prompt_missing(options, "reason", "reason")
+    owner = _prompt_missing(options, "owner", "owner")
+    ticket = _prompt_missing(options, "ticket", "ticket")
 
     exception = create_exception(
         resource_type=resource_type,
@@ -55,10 +57,12 @@ def _handle_exception(parts: list[str]) -> None:
         issue_name=issue_name,
         duration_minutes=int(duration_text),
         reason=reason,
+        owner=owner,
+        ticket=ticket,
     )
     print(
-        f"{GREEN}Exception created: {exception['id']} "
-        f"(expires {exception['expires_at']}){RESET}"
+        f"{GREEN}Exception requested: {exception['id']} "
+        f"(status {exception['status']}; activate with acg exception activate){RESET}"
     )
 
 

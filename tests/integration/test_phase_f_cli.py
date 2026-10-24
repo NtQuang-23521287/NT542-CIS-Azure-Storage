@@ -168,10 +168,12 @@ def test_cli_execute_checks_approval_and_exception_store_then_verifies_with_fake
     approval = approve_plan(plan, "operator")
     plan_path = tmp_path / "plan.json"
     approval_path = tmp_path / "approval.json"
-    exceptions_path = tmp_path / "exceptions.json"
+    exceptions_path = tmp_path / "exceptions.sqlite3"
     plan_path.write_text(json.dumps(plan.to_dict()), encoding="utf-8")
     approval_path.write_text(json.dumps(approval.to_dict()), encoding="utf-8")
-    exceptions_path.write_text("[]", encoding="utf-8")
+    from azure_compliance_guard.exceptions import ExceptionRepository
+
+    ExceptionRepository(exceptions_path).initialize()
     corrected = replace(state, public_network_access="Disabled")
     observations = iter((state, corrected))
     monkeypatch.setattr(cli, "_azure_states", lambda _service: [next(observations)])
@@ -200,7 +202,7 @@ def test_cli_execute_checks_approval_and_exception_store_then_verifies_with_fake
             str(plan_path),
             "--approval",
             str(approval_path),
-            "--exceptions",
+            "--exceptions-db",
             str(exceptions_path),
             "--execute",
         ]
