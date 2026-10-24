@@ -3,7 +3,7 @@ main.py - Compliance monitoring loop for Azure Storage, Key Vault, and SQL.
 
 Checks run every CHECK_INTERVAL seconds.
 CRITICAL issues produce a remediation plan by default.
-Azure mutation requires explicit operator opt-in through configuration.
+Azure mutation is not performed by this legacy monitor.
 WARNING issues require admin confirmation or manual follow-up.
 """
 
@@ -22,7 +22,6 @@ from collector import (
     initialize_azure_clients,
 )
 from config import (
-    ALLOW_AZURE_MUTATIONS,
     CHECK_INTERVAL,
     COMPLIANCE_LOG_FILE,
     KEY_VAULT_NAME,
@@ -88,10 +87,7 @@ def monitor():
     print(f"  Key Vault       : {KEY_VAULT_NAME}")
     print(f"  SQL Server      : {SQL_SERVER_NAME}")
     print(f"  Check interval  : {CHECK_INTERVAL}s\n")
-    print(
-        "  Azure mutations : "
-        f"{'ENABLED (temporary P0 opt-in)' if ALLOW_AZURE_MUTATIONS else 'DISABLED (plan-only)'}\n"
-    )
+    print("  Azure mutations : DISABLED (use acg remediation workflow)\n")
     logging.info("=== Compliance Monitor started ===")
 
     while True:
@@ -160,7 +156,7 @@ def monitor():
                         RESOURCE_GROUP,
                         resource_name,
                         all_issues,
-                        allow_mutation=ALLOW_AZURE_MUTATIONS,
+                        allow_mutation=False,
                     )
                 else:
                     msg = f"{service_name} {resource_name} is compliant."

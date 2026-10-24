@@ -31,7 +31,7 @@ def _boolean_env(name: str, default: bool = False) -> bool:
     raise ValueError(f"{name} must be a boolean value")
 
 
-# Temporary P0 safety gate. The long-term workflow is plan -> approval -> execute -> verify.
+# Used only by the exact-plan CLI workflow; the legacy monitor stays plan-only.
 ALLOW_AZURE_MUTATIONS = _boolean_env("ALLOW_AZURE_MUTATIONS", default=False)
 
 # Monitored resources. Defaults match the Terraform module.

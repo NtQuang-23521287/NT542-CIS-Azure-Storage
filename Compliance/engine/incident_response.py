@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 
 from audit_logger import log_incident_event
-from azure_cli import display_az_command, run_az
+from azure_cli import display_az_command
 from exception_manager import (
     find_active_exception_for_resource,
     revoke_active_exceptions_for_resource,
@@ -66,14 +66,7 @@ def _run_containment(
         for part in command_template
     ]
     command = display_az_command(args)
-    if not allow_mutation:
-        return "PLANNED", command
-
-    result = run_az(args)
-    if result.returncode == 0:
-        return "SUCCESS", command
-    error = result.stderr.strip() or result.stdout.strip()
-    return "FAILED", f"{command} | {error}"
+    return "PLANNED", command
 
 
 def handle_incident(
@@ -100,7 +93,7 @@ def handle_incident(
         allow_mutation=allow_mutation,
     )
     containment_action = (
-        "containment plan generated; explicit operator opt-in is required"
+        "containment suggestion generated; exact-plan approval is required"
         if containment_status == "PLANNED"
         else "urgent review required; validate the containment result"
     )

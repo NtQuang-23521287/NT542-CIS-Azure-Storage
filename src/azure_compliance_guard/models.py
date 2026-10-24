@@ -1,3 +1,5 @@
+import hashlib
+import json
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -87,8 +89,15 @@ class Finding:
     actual: object
     expected: object
 
+    @property
+    def finding_id(self) -> str:
+        identity = [self.rule_id, self.resource.to_dict(), self.actual]
+        encoded = json.dumps(identity, sort_keys=True, separators=(",", ":"))
+        return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
     def to_dict(self) -> dict[str, object]:
         return {
+            "finding_id": self.finding_id,
             "rule_id": self.rule_id,
             "title": self.title,
             "service": self.service,

@@ -38,7 +38,7 @@ class RemediationSafetyTests(TestCase):
                 "AZURE_SUBSCRIPTION_ID",
                 "00000000-0000-0000-0000-000000000001",
             ),
-            patch.object(incident_response, "run_az") as run_az,
+            patch.object(azure_cli, "run_az") as run_az,
         ):
             status, command = incident_response._run_containment(
                 "rg-demo",
@@ -66,6 +66,39 @@ class RemediationSafetyTests(TestCase):
             )
 
         run_command.assert_not_called()
+
+    def test_legacy_opt_in_cannot_bypass_exact_plan_approval(self):
+        issue = {"name": "Public Network Access mismatch", "severity": "CRITICAL"}
+        with (
+            patch.object(
+                azure_cli,
+                "AZURE_SUBSCRIPTION_ID",
+                "00000000-0000-0000-0000-000000000001",
+            ),
+            patch.object(remediation, "find_active_exception", return_value=None),
+            patch.object(remediation, "_run_command") as run_command,
+            patch.object(remediation, "log_compliance_event"),
+        ):
+            remediation.remediate_config(
+                "rg-demo", "storage-demo", [issue], allow_mutation=True
+            )
+        run_command.assert_not_called()
+
+    def test_legacy_incident_opt_in_cannot_bypass_approval(self):
+        issue = {"name": "Suspicious access", "service": "storage"}
+        with (
+            patch.object(
+                azure_cli,
+                "AZURE_SUBSCRIPTION_ID",
+                "00000000-0000-0000-0000-000000000001",
+            ),
+            patch.object(azure_cli, "run_az") as run_az,
+        ):
+            status, _command = incident_response._run_containment(
+                "rg-demo", "storage-demo", issue, allow_mutation=True
+            )
+        self.assertEqual("PLANNED", status)
+        run_az.assert_not_called()
 
 
 if __name__ == "__main__":
