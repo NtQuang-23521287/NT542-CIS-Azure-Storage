@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import ipaddress
+import re
 from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
 
 from jinja2 import Environment, PackageLoader, StrictUndefined
 
@@ -30,6 +33,11 @@ _SAFE_VALUES = frozenset(
 )
 _SAFE_SERVICES = frozenset({"storage", "key_vault", "sql"})
 _SAFE_SEVERITIES = frozenset({"PASS", "WARNING", "CRITICAL", "ESCALATED_CRITICAL"})
+_MAPPING_STATES = frozenset({"EXACT", "PARTIAL", "NOT_COMPARABLE", "UNVERIFIED"})
+
+
+def _known_rule(value: object) -> str | None:
+    return value if isinstance(value, str) and value in _RULE_TITLES else None
 
 
 def _label(value: object, prefix: str) -> str:
@@ -104,6 +112,7 @@ def _public_data(event_type: str, raw: dict) -> dict:
         }
     if event_type.startswith("EXCEPTION_"):
         return {
+            "rule_id": _known_rule(raw.get("rule_id")),
             "reason": "Sanitized fixture reason"
             if raw.get("reason") and raw.get("fixture_sanitized") is True
             else "Redacted",
@@ -124,8 +133,29 @@ def _public_data(event_type: str, raw: dict) -> dict:
         }
     if event_type.startswith("REMEDIATION_"):
         return {
+            "rule_id": _known_rule(raw.get("rule_id")),
             "plan": _label(raw["plan_id"], "plan") if raw.get("plan_id") else None,
             "verification_ms": _count(raw.get("verification_ms")),
+        }
+    if event_type == "VALIDATION_CASE":
+        case_id = raw.get("case_id")
+        status = raw.get("mapping_status")
+        covered = raw.get("covered_rules")
+        return {
+            "case_id": case_id
+            if isinstance(case_id, str)
+            and re.fullmatch(r"ACG-VAL-[A-Z0-9-]{1,72}", case_id)
+            else _label(case_id, "case"),
+            "tp": _count(raw.get("tp")),
+            "tn": _count(raw.get("tn")),
+            "fp": _count(raw.get("fp")),
+            "fn": _count(raw.get("fn")),
+            "covered_rules": [rule for rule in covered if _known_rule(rule)]
+            if isinstance(covered, list)
+            else [],
+            "mapping_status": status
+            if isinstance(status, str) and status in _MAPPING_STATES
+            else "UNVERIFIED",
         }
     return {}
 
@@ -166,7 +196,7 @@ def public_events(events: list[dict]) -> list[dict]:
     return projected
 
 
-def render_report(events: list[dict]) -> str:
+def build_report_context(events: list[dict]) -> dict:
     if not events:
         raise EvidenceError("evidence stream is empty")
     projected = public_events(events)
@@ -194,6 +224,103 @@ def render_report(events: list[dict]) -> str:
         "rules": rules_evaluated,
         "duration_ms": sum(item["duration_ms"] or 0 for item in completed),
     }
+    kinds = [item["event_type"] for item in projected]
+    verification_times = [
+        item["data"]["verification_ms"]
+        for item in projected
+        if item["event_type"] == "REMEDIATION_VERIFIED"
+        and item["data"]["verification_ms"] is not None
+    ]
+    verified = kinds.count("REMEDIATION_VERIFIED")
+    failed = kinds.count("REMEDIATION_FAILED")
+    remediation = {
+        "planned": kinds.count("REMEDIATION_PLANNED"),
+        "approved": kinds.count("REMEDIATION_APPROVED"),
+        "verified": verified,
+        "failed": failed,
+        "success_rate": f"{verified / (verified + failed) * 100:.1f}%"
+        if verified + failed
+        else "N/A",
+        "mean_verification_ms": round(sum(verification_times) / len(verification_times))
+        if verification_times
+        else "N/A",
+    }
+    exception_states = {}
+    exception_by_finding = {}
+    remediation_by_finding = {}
+    for item in sorted(projected, key=lambda value: value["timestamp"]):
+        kind = item["event_type"]
+        data = item["data"]
+        resource = item["resource"]
+        key = (resource["name"], data.get("rule_id")) if resource else None
+        if kind.startswith("EXCEPTION_"):
+            state = kind.removeprefix("EXCEPTION_").replace("_", " ")
+            if data.get("exception"):
+                exception_states[data["exception"]] = state
+            if key and data.get("rule_id"):
+                exception_by_finding[key] = state
+        if kind.startswith("REMEDIATION_") and key and data.get("rule_id"):
+            remediation_by_finding[key] = kind.removeprefix("REMEDIATION_").replace(
+                "_", " "
+            )
+    for item in finding_rows:
+        key = (item["resource"]["name"], item["data"]["rule_id"])
+        item["exception_state"] = exception_by_finding.get(key, "None recorded")
+        item["remediation_state"] = remediation_by_finding.get(key, "None recorded")
+    exceptions = {
+        "active": sum(state == "ACTIVATED" for state in exception_states.values()),
+        "expired": kinds.count("EXCEPTION_EXPIRED"),
+        "revoked": kinds.count("EXCEPTION_REVOKED"),
+        "incident_revoked": kinds.count("EXCEPTION_INCIDENT_REVOKED"),
+    }
+    incidents = {
+        "security_events_evaluated": sum(
+            item["data"]["security_events_evaluated"] or 0
+            for item in projected
+            if item["event_type"] == "INCIDENT_DETECTED"
+        ),
+        "escalated": kinds.count("INCIDENT_ESCALATED"),
+    }
+    cases = [item for item in projected if item["event_type"] == "VALIDATION_CASE"]
+    covered_rules = {rule for item in cases for rule in item["data"]["covered_rules"]}
+    try:
+        acg_version = version("nt542-cis-azure-storage")
+    except PackageNotFoundError:
+        acg_version = "local checkout"
+    validation = {
+        "scope": "Offline fixture" if cases else "No validation cases recorded",
+        "case_count": len(cases),
+        "run_at": min((item["timestamp"] for item in cases), default="Not recorded"),
+        "acg_version": acg_version,
+        "catalog_version": 1,
+        "prowler_version": "Not run",
+        "azure_policy_version": "Not run",
+        "covered_rules": len(covered_rules),
+        "catalog_rules": len(_RULE_TITLES),
+        **{
+            key: sum(item["data"][key] or 0 for item in cases)
+            for key in ("tp", "tn", "fp", "fn")
+        },
+        "exact_agreement": "UNVERIFIED",
+        "cases": [{"timestamp": item["timestamp"], **item["data"]} for item in cases],
+    }
+    return {
+        "summary": summary,
+        "findings": finding_rows,
+        "timeline": sorted(projected, key=lambda item: item["timestamp"]),
+        "remediation": remediation,
+        "exceptions": exceptions,
+        "incidents": incidents,
+        "validation": validation,
+        "generated_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
+        "source_label": "Fixture demonstration"
+        if all(item["source"] == "fixture" for item in projected)
+        else "Local evidence",
+    }
+
+
+def render_report(events: list[dict]) -> str:
+    context = build_report_context(events)
     # Jinja's official API recommends explicitly enabling autoescape.
     # https://jinja.palletsprojects.com/en/stable/api/#autoescaping
     environment = Environment(
@@ -201,12 +328,13 @@ def render_report(events: list[dict]) -> str:
         autoescape=True,
         undefined=StrictUndefined,
     )
-    return environment.get_template("report.html.j2").render(
-        summary=summary,
-        findings=finding_rows,
-        timeline=sorted(projected, key=lambda item: item["timestamp"]),
-        generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC"),
-        source_label="Fixture demonstration"
-        if all(item["source"] == "fixture" for item in projected)
-        else "Local evidence",
-    )
+    source = environment.loader.get_source(environment, "report.html.j2")[0]
+    script = re.search(r"<script>(.*?)</script>", source, re.S)
+    if script is None:
+        raise EvidenceError("report filter script is missing")
+    # CSP hash covers only this trusted, static script; no evidence is embedded.
+    # https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/script-src
+    context["script_hash"] = base64.b64encode(
+        hashlib.sha256(script.group(1).encode("utf-8")).digest()
+    ).decode("ascii")
+    return environment.get_template("report.html.j2").render(**context)
