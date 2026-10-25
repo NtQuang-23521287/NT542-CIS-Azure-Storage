@@ -11,6 +11,7 @@ dependencies = [
     "azure-identity>=1.25.3,<2",
     "azure-mgmt-resource>=25,<26",
     "azure-mgmt-storage>=25,<26",
+    "jinja2>=3.1.6,<3.2",
     "python-dotenv>=1.2.2,<2",
     "pyyaml>=6.0.3,<7",
 ]
@@ -45,4 +46,4 @@ select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
 where = ["src"]
 
 [tool.setuptools.package-data]
-azure_compliance_guard = ["rules/*.yaml", "fixtures/*.json"]
+azure_compliance_guard = ["rules/*.yaml", "fixtures/*.json", "templates/*.j2"]

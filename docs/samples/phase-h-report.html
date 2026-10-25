@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'sha256-N8ajPnsP0yr1LEFzHwB5xlCRdaE/nVJuC33X9MHsMGo='; img-src data:; base-uri 'none'; form-action 'none'">
+  <title>ACG Evidence Report</title>
+  <style>
+    :root { color-scheme: dark; --bg:#0c151c; --panel:#14242d; --line:#29404a; --text:#eaf4f3; --muted:#a4b8bc; --accent:#71d4bc; --amber:#f3c97d; --red:#f08c83; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif; }
+    a { color:var(--accent); }
+    .shell { max-width:1320px; margin:auto; padding:0 24px 64px; }
+    header { border-bottom:1px solid var(--line); padding:30px 0 24px; }
+    .eyebrow { color:var(--accent); font-size:.75rem; font-weight:750; letter-spacing:.17em; text-transform:uppercase; }
+    h1 { margin:.25rem 0 .4rem; font-size:clamp(1.8rem,3vw,2.7rem); letter-spacing:-.04em; line-height:1.1; }
+    h2 { margin:0 0 16px; font-size:1.22rem; letter-spacing:-.02em; }
+    h3 { margin:0; font-size:1rem; }
+    p { margin:.35rem 0; }
+    .subtitle,.muted { color:var(--muted); }
+    .meta { display:flex; flex-wrap:wrap; gap:8px 20px; color:var(--muted); font-size:.85rem; margin-top:16px; }
+    main { display:grid; gap:28px; padding-top:28px; }
+    .section-heading { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:14px; }
+    .section-heading p { font-size:.82rem; color:var(--muted); }
+    .cards { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:18px; min-height:112px; }
+    .card .label { display:block; color:var(--muted); font-size:.77rem; text-transform:uppercase; letter-spacing:.08em; }
+    .card strong { display:block; margin-top:10px; font-size:1.85rem; font-variant-numeric:tabular-nums; line-height:1; }
+    .card.primary { border-color:#438b80; }
+    .card.primary strong { color:var(--accent); }
+    .metric-groups { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+    .metric-group { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:16px; }
+    .metric-group h3 { color:var(--accent); margin-bottom:8px; }
+    .metric-group dl { display:grid; grid-template-columns:1fr auto; gap:5px 14px; margin:0; }
+    .metric-group dt { color:var(--muted); }
+    .metric-group dd { margin:0; font-variant-numeric:tabular-nums; font-weight:700; }
+    .filters { display:flex; flex-wrap:wrap; align-items:end; gap:10px; margin-bottom:12px; }
+    .filters label { display:grid; gap:4px; color:var(--muted); font-size:.82rem; }
+    .filters select { min-width:145px; background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:5px; padding:8px; font:inherit; }
+    .filters select:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+    .filters output { color:var(--muted); font-size:.82rem; margin-left:auto; padding-bottom:8px; }
+    .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+    .table-scroll { overflow-x:auto; }
+    table { width:100%; border-collapse:collapse; text-align:left; }
+    th,td { padding:12px 14px; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { color:var(--muted); font-size:.74rem; letter-spacing:.07em; text-transform:uppercase; white-space:nowrap; }
+    tbody tr:last-child td { border-bottom:0; }
+    .rule { color:var(--accent); font-weight:700; white-space:nowrap; }
+    .resource { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:.83rem; overflow-wrap:anywhere; }
+    .badge { display:inline-block; padding:2px 8px; border:1px solid currentColor; border-radius:4px; font-size:.75rem; font-weight:700; white-space:nowrap; }
+    .badge.CRITICAL,.badge.ESCALATED_CRITICAL { color:var(--red); }
+    .badge.WARNING { color:var(--amber); }
+    .timeline { list-style:none; padding:4px 20px 8px; margin:0; }
+    .timeline li { border-left:2px solid var(--line); padding:10px 0 14px 20px; position:relative; }
+    .timeline li::before { content:""; position:absolute; width:8px; height:8px; border-radius:50%; background:var(--accent); left:-5px; top:18px; }
+    .timeline time { display:block; color:var(--muted); font-size:.77rem; }
+    .timeline .event { font-weight:700; }
+    .timeline .detail { color:var(--muted); font-size:.83rem; }
+    .note { border-left:3px solid var(--amber); padding:10px 14px; background:#2a2a25; color:#f7e4c4; }
+    .stack-gap { margin-top:12px; }
+    .empty { color:var(--muted); padding:20px; }
+    footer { border-top:1px solid var(--line); margin-top:32px; padding-top:20px; color:var(--muted); font-size:.82rem; }
+    @media (max-width:900px) { .cards { grid-template-columns:repeat(2,minmax(0,1fr)); } .metric-groups { grid-template-columns:1fr; } }
+    @media (max-width:560px) { .shell { padding-left:16px; padding-right:16px; } .cards { grid-template-columns:repeat(2,minmax(0,1fr)); } .card { padding:14px; min-height:102px; } .card strong { font-size:1.5rem; } .section-heading { display:block; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="eyebrow">Azure Compliance Guard / Evidence</div>
+      <h1>Compliance snapshot</h1>
+      <p class="subtitle">Static, offline report from append-only local evidence.</p>
+      <div class="meta"><span>Fixture demonstration</span><span>Generated 2026-10-24 05:01 UTC</span><span>Public identifiers are pseudonymized</span></div>
+    </header>
+    <main>
+      <section aria-labelledby="overview-title">
+        <div class="section-heading"><h2 id="overview-title">Overview</h2><p>Compliance is evaluated rules without findings / all evaluated rules.</p></div>
+        <div class="cards">
+          <div class="card primary"><span class="label">Compliance</span><strong>50.0%</strong></div>
+          <div class="card"><span class="label">PASS</span><strong>17</strong></div>
+          <div class="card"><span class="label">WARNING</span><strong>4</strong></div>
+          <div class="card"><span class="label">CRITICAL</span><strong>13</strong></div>
+          <div class="card"><span class="label">Resources scanned</span><strong>6</strong></div>
+          <div class="card"><span class="label">Rules evaluated</span><strong>34</strong></div>
+          <div class="card"><span class="label">Scan duration</span><strong>420<small> ms</small></strong></div>
+          <div class="card"><span class="label">Findings</span><strong>17</strong></div>
+        </div>
+      </section>
+      <section aria-labelledby="lifecycle-title">
+        <div class="section-heading"><h2 id="lifecycle-title">Lifecycle metrics</h2><p>N/A means there is no outcome denominator.</p></div>
+        <div class="metric-groups">
+          <div class="metric-group"><h3>Remediation</h3><dl><dt>Plans generated</dt><dd>1</dd><dt>Approved</dt><dd>1</dd><dt>Verified</dt><dd>1</dd><dt>Verification failed</dt><dd>0</dd><dt>Success rate</dt><dd>100.0%</dd><dt>Mean verification time</dt><dd>1200 ms</dd></dl></div>
+          <div class="metric-group"><h3>Exceptions</h3><dl><dt>Active</dt><dd>0</dd><dt>Expired</dt><dd>1</dd><dt>Revoked</dt><dd>1</dd><dt>Incident revoked</dt><dd>1</dd></dl></div>
+          <div class="metric-group"><h3>Incidents</h3><dl><dt>Security events evaluated</dt><dd>5</dd><dt>Escalated events</dt><dd>1</dd></dl></div>
+        </div>
+      </section>
+      <section aria-labelledby="findings-title">
+        <div class="section-heading"><h2 id="findings-title">Findings</h2><p>Observed drift from evaluated rules</p></div>
+        <div class="filters" role="group" aria-label="Filter findings">
+          <label for="service-filter">Service<select id="service-filter"><option value="all">All services</option><option value="storage">Storage</option><option value="key_vault">Key Vault</option><option value="sql">SQL</option></select></label>
+          <label for="severity-filter">Severity<select id="severity-filter"><option value="all">All severities</option><option value="WARNING">Warning</option><option value="CRITICAL">Critical</option><option value="ESCALATED_CRITICAL">Escalated critical</option></select></label>
+          <label for="status-filter">Status<select id="status-filter"><option value="all">All statuses</option><option value="FAIL">Fail</option><option value="PASS">Pass</option></select></label>
+          <output id="filter-count" role="status">17 finding(s)</output>
+        </div>
+        <div class="panel table-scroll">
+          <table><thead><tr><th scope="col">Rule / title</th><th scope="col">Service</th><th scope="col">Severity / status</th><th scope="col">Resource</th><th scope="col">Expected</th><th scope="col">Actual</th><th scope="col">Exception</th><th scope="col">Remediation</th></tr></thead><tbody>
+            <tr data-service="storage" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-STO-001</span><br>Require HTTPS traffic only</td><td>storage</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">storage-a412439a18</td><td>True</td><td>False</td><td>INCIDENT REVOKED</td><td>VERIFIED</td></tr>
+            <tr data-service="storage" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-STO-002</span><br>Require minimum TLS 1.2</td><td>storage</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">storage-a412439a18</td><td>TLS1_2</td><td>TLS1_0</td><td>REVOKED</td><td>None recorded</td></tr>
+            <tr data-service="storage" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-STO-003</span><br>Disable public network access</td><td>storage</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">storage-a412439a18</td><td>Disabled</td><td>Enabled</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="storage" data-severity="WARNING" data-status="FAIL"><td><span class="rule">ACG-STO-004</span><br>Enable blob versioning</td><td>storage</td><td><span class="badge WARNING">WARNING</span><br>FAIL</td><td class="resource">storage-a412439a18</td><td>True</td><td>False</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="key_vault" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-KV-001</span><br>Disable Key Vault public network access</td><td>key_vault</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">key_vault-4701c632a3</td><td>Disabled</td><td>Enabled</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="key_vault" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-KV-002</span><br>Enable Key Vault RBAC authorization</td><td>key_vault</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">key_vault-4701c632a3</td><td>True</td><td>False</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="key_vault" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-KV-003</span><br>Enable Key Vault purge protection</td><td>key_vault</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">key_vault-4701c632a3</td><td>True</td><td>False</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="key_vault" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-KV-004</span><br>Enable Key Vault soft delete</td><td>key_vault</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">key_vault-4701c632a3</td><td>True</td><td>False</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="key_vault" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-KV-005</span><br>Require a Key Vault private endpoint</td><td>key_vault</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">key_vault-4701c632a3</td><td>True</td><td>False</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="key_vault" data-severity="WARNING" data-status="FAIL"><td><span class="rule">ACG-KV-006</span><br>Require expiry dates on Key Vault keys</td><td>key_vault</td><td><span class="badge WARNING">WARNING</span><br>FAIL</td><td class="resource">key_vault-4701c632a3</td><td>True</td><td>False</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="key_vault" data-severity="WARNING" data-status="FAIL"><td><span class="rule">ACG-KV-007</span><br>Require expiry dates on Key Vault secrets</td><td>key_vault</td><td><span class="badge WARNING">WARNING</span><br>FAIL</td><td class="resource">key_vault-4701c632a3</td><td>True</td><td>False</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="sql" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-SQL-001</span><br>Enable SQL auditing</td><td>sql</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">sql-78de46810c</td><td>True</td><td>False</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="sql" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-SQL-002</span><br>Enable Microsoft Defender for SQL</td><td>sql</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">sql-78de46810c</td><td>True</td><td>False</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="sql" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-SQL-003</span><br>Require SQL minimum TLS 1.2</td><td>sql</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">sql-78de46810c</td><td>1.2</td><td>1.0</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="sql" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-SQL-004</span><br>Disable SQL public network access</td><td>sql</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">sql-78de46810c</td><td>Disabled</td><td>Enabled</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="sql" data-severity="CRITICAL" data-status="FAIL"><td><span class="rule">ACG-SQL-005</span><br>Require a SQL private endpoint</td><td>sql</td><td><span class="badge CRITICAL">CRITICAL</span><br>FAIL</td><td class="resource">sql-78de46810c</td><td>True</td><td>False</td><td>None recorded</td><td>None recorded</td></tr>
+            <tr data-service="sql" data-severity="WARNING" data-status="FAIL"><td><span class="rule">ACG-SQL-006</span><br>Configure a SQL Azure AD administrator</td><td>sql</td><td><span class="badge WARNING">WARNING</span><br>FAIL</td><td class="resource">sql-78de46810c</td><td>True</td><td>False</td><td>None recorded</td><td>None recorded</td></tr>
+          </tbody></table>
+        </div>
+      </section>
+      <section aria-labelledby="timeline-title">
+        <div class="section-heading"><h2 id="timeline-title">Timeline</h2><p>Events in timestamp order</p></div>
+        <div class="panel"><ol class="timeline">
+          <li><time datetime="2026-10-24T10:00:00+00:00">2026-10-24T10:00:00+00:00</time><div class="event">RUN STARTED</div><div class="detail">fixture · Scan</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · key_vault-4701c632a3</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · key_vault-4701c632a3</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · key_vault-4701c632a3</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · key_vault-4701c632a3</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · key_vault-4701c632a3</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · key_vault-4701c632a3</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · key_vault-4701c632a3</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · sql-78de46810c</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · sql-78de46810c</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · sql-78de46810c</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · sql-78de46810c</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · sql-78de46810c</div></li>
+          <li><time datetime="2026-10-24T10:01:00+00:00">2026-10-24T10:01:00+00:00</time><div class="event">FINDING</div><div class="detail">fixture · Scan · sql-78de46810c</div></li>
+          <li><time datetime="2026-10-24T10:02:00+00:00">2026-10-24T10:02:00+00:00</time><div class="event">RUN COMPLETED</div><div class="detail">fixture · Scan</div></li>
+          <li><time datetime="2026-10-24T10:03:00+00:00">2026-10-24T10:03:00+00:00</time><div class="event">VALIDATION CASE</div><div class="detail">fixture · Fixture validation</div></li>
+          <li><time datetime="2026-10-24T10:04:00+00:00">2026-10-24T10:04:00+00:00</time><div class="event">VALIDATION CASE</div><div class="detail">fixture · Fixture validation</div></li>
+          <li><time datetime="2026-10-24T10:05:00+00:00">2026-10-24T10:05:00+00:00</time><div class="event">VALIDATION CASE</div><div class="detail">fixture · Fixture validation</div></li>
+          <li><time datetime="2026-10-24T10:06:00+00:00">2026-10-24T10:06:00+00:00</time><div class="event">VALIDATION CASE</div><div class="detail">fixture · Fixture validation</div></li>
+          <li><time datetime="2026-10-24T10:07:00+00:00">2026-10-24T10:07:00+00:00</time><div class="event">VALIDATION CASE</div><div class="detail">fixture · Fixture validation</div></li>
+          <li><time datetime="2026-10-24T10:08:00+00:00">2026-10-24T10:08:00+00:00</time><div class="event">VALIDATION CASE</div><div class="detail">fixture · Fixture validation</div></li>
+          <li><time datetime="2026-10-24T10:10:00+00:00">2026-10-24T10:10:00+00:00</time><div class="event">EXCEPTION CREATED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:11:00+00:00">2026-10-24T10:11:00+00:00</time><div class="event">EXCEPTION ACTIVATED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:12:00+00:00">2026-10-24T10:12:00+00:00</time><div class="event">INCIDENT DETECTED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:13:00+00:00">2026-10-24T10:13:00+00:00</time><div class="event">INCIDENT ESCALATED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:14:00+00:00">2026-10-24T10:14:00+00:00</time><div class="event">EXCEPTION INCIDENT REVOKED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:15:00+00:00">2026-10-24T10:15:00+00:00</time><div class="event">INCIDENT CONTAINMENT</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:16:00+00:00">2026-10-24T10:16:00+00:00</time><div class="event">REMEDIATION PLANNED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:17:00+00:00">2026-10-24T10:17:00+00:00</time><div class="event">REMEDIATION DRY RUN</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:18:00+00:00">2026-10-24T10:18:00+00:00</time><div class="event">REMEDIATION APPROVED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:19:00+00:00">2026-10-24T10:19:00+00:00</time><div class="event">REMEDIATION EXECUTION</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:20:00+00:00">2026-10-24T10:20:00+00:00</time><div class="event">REMEDIATION RECOLLECTED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:21:00+00:00">2026-10-24T10:21:00+00:00</time><div class="event">REMEDIATION VERIFIED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:22:00+00:00">2026-10-24T10:22:00+00:00</time><div class="event">EXCEPTION CREATED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:23:00+00:00">2026-10-24T10:23:00+00:00</time><div class="event">EXCEPTION ACTIVATED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:24:00+00:00">2026-10-24T10:24:00+00:00</time><div class="event">EXCEPTION EXPIRED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:25:00+00:00">2026-10-24T10:25:00+00:00</time><div class="event">EXCEPTION CREATED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:26:00+00:00">2026-10-24T10:26:00+00:00</time><div class="event">EXCEPTION ACTIVATED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+          <li><time datetime="2026-10-24T10:27:00+00:00">2026-10-24T10:27:00+00:00</time><div class="event">EXCEPTION REVOKED</div><div class="detail">fixture · Simulated lifecycle · storage-a412439a18</div></li>
+        </ol></div>
+      </section>
+      <section aria-labelledby="validation-title">
+        <div class="section-heading"><h2 id="validation-title">External validation</h2><p>Detection credibility is separate from remediation lifecycle.</p></div>
+        <div class="note"><strong>UNVERIFIED external agreement.</strong> Prowler and Azure Policy were not run. Fixture-only results do not establish live accuracy or exact control mapping.</div>
+        <div class="panel table-scroll stack-gap"><table><tbody>
+          <tr><th scope="row">Scope / cases</th><td>Offline fixture · 6 case(s) · 2026-10-24T10:03:00+00:00</td></tr>
+          <tr><th scope="row">Versions</th><td>ACG 0.2.0 · Rule catalog schema 1 · Prowler Not run · Azure Policy Not run</td></tr>
+          <tr><th scope="row">Supported rule coverage</th><td>17 / 17 internal rules represented</td></tr>
+          <tr><th scope="row">Fixture confusion matrix</th><td>TP 17 · TN 17 · FP 0 · FN 0</td></tr>
+          <tr><th scope="row">Exact-mapping agreement</th><td>UNVERIFIED</td></tr>
+        </tbody></table></div>
+<div class="panel table-scroll stack-gap"><table><thead><tr><th scope="col">Case</th><th scope="col">TP</th><th scope="col">TN</th><th scope="col">FP</th><th scope="col">FN</th><th scope="col">Mapping</th></tr></thead><tbody>
+<tr><td>ACG-VAL-STO-SECURE-001</td><td>0</td><td>4</td><td>0</td><td>0</td><td>UNVERIFIED</td></tr><tr><td>ACG-VAL-STO-DRIFT-001</td><td>4</td><td>0</td><td>0</td><td>0</td><td>UNVERIFIED</td></tr><tr><td>ACG-VAL-KV-SECURE-001</td><td>0</td><td>7</td><td>0</td><td>0</td><td>UNVERIFIED</td></tr><tr><td>ACG-VAL-KV-DRIFT-001</td><td>7</td><td>0</td><td>0</td><td>0</td><td>UNVERIFIED</td></tr><tr><td>ACG-VAL-SQL-SECURE-001</td><td>0</td><td>6</td><td>0</td><td>0</td><td>UNVERIFIED</td></tr><tr><td>ACG-VAL-SQL-DRIFT-001</td><td>6</td><td>0</td><td>0</td><td>0</td><td>UNVERIFIED</td></tr>        </tbody></table></div>      </section>
+    </main>
+    <footer>Azure Compliance Guard · Offline evidence report · No Azure account or web server required</footer>
+  </div>
+  <script>
+    const controls = ["service", "severity", "status"].map(name => document.getElementById(`${name}-filter`));
+    const rows = [...document.querySelectorAll("tr[data-service]")];
+    const count = document.getElementById("filter-count");
+    function filterRows() {
+      let visible = 0;
+      for (const row of rows) {
+        row.hidden = controls.some((control, index) => control.value !== "all" && control.value !== row.dataset[["service", "severity", "status"][index]]);
+        if (!row.hidden) visible++;
+      }
+      count.textContent = `${visible} finding(s)`;
+    }
+    for (const control of controls) control.addEventListener("change", filterRows);
+  </script>
+</body>
+</html>

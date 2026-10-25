@@ -31,6 +31,7 @@ htmlcov/
 /Compliance/data/exceptions.json
 /Compliance/data/security_signals.json
 /reports/private/
+/build/
 
 # Terraform local state and plans. Keep .terraform.lock.hcl tracked.
 .terraform/
