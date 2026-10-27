@@ -147,6 +147,16 @@ them according to your local retention procedure. There is no automatic upload
 or GitHub Pages publication. See [Phase H status](docs/phase-h-status.md) for
 data provenance, validation scope, and current limits.
 
+## Phase I Storage incident signal
+
+`acg incident scan` reads successful sensitive Blob operations from Azure Monitor
+`StorageBlobLogs`, checks source IPs against explicit trusted CIDRs, and records
+incident evidence. A matching active public-network exception can be revoked;
+the containment proposal requires a separate reviewed Phase F plan. Run
+`acg incident verify` after containment to record a fresh Storage state check.
+See [Phase I status and commands](docs/phase-i-status.md). The real Azure lab
+checkpoint is still pending.
+
 ## Phase F remediation workflow
 
 Có thể kiểm tra lập kế hoạch và dry-run mà không cần Azure:
