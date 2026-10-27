@@ -35,19 +35,20 @@ evaluator -> WARNING / CRITICAL / ESCALATED_CRITICAL
 plan-only remediation (default) -> audit logs
 ```
 
-Storage được đọc bằng Azure SDK. Key Vault và SQL hiện dùng Azure CLI. Incident signals hiện vẫn được đọc từ file local `Compliance/data/security_signals.json`; chúng chưa đến từ Azure Monitor/KQL.
+The installable CLI reads Storage through the Azure management SDK and Key Vault/SQL through scoped Azure CLI calls. Its Phase I incident command can query Azure Monitor/KQL; the legacy monitor still reads local signals from `Compliance/data/security_signals.json`. Live Azure Monitor ingestion remains unverified.
 
 ## Cấu trúc repository
 
 ```text
 src/azure_compliance_guard/       Installable CLI and typed scan engine
 Compliance/engine/                Legacy monitoring/remediation workflows
-Terraform/azure-secure-storage/   Terraform root module
+Terraform/azure-minimal-storage/  Phase K default Storage + Log Analytics root
+Terraform/azure-secure-storage/   Existing full-demo Terraform root
 tests/                             Offline safety tests
 docs/                              Audit, architecture và report gốc
 ```
 
-Entrypoint Phase E là `acg`; legacy monitor vẫn ở `Compliance/engine/main.py` trong thời gian migrate tăng dần. Terraform root là `Terraform/azure-secure-storage`.
+Entrypoint Phase E là `acg`; legacy monitor vẫn ở `Compliance/engine/main.py` trong thời gian migrate tăng dần. The two Terraform roots have separate state and resource groups; start with `Terraform/azure-minimal-storage` for the Phase K demo.
 
 ## Kiểm chứng offline
 
@@ -233,6 +234,12 @@ PR CI stays offline. The separate `Manual Azure plan` workflow runs only by manu
 
 The package version is `0.2.0`. Version tags `vX.Y.Z` from reviewed `main` commits build wheel/source artifacts, generate an SBOM and provenance attestations, and open a draft GitHub release for maintainer review. The first tag workflow run is still pending.
 
+## Phase K: cost-safe demo profile
+
+The default demo is the separate `Terraform/azure-minimal-storage` root: a dedicated tagged resource group, Standard LRS Storage account, Log Analytics workspace and Blob diagnostic setting. It has its own remote Terraform state key. The original `Terraform/azure-secure-storage` root is the **full-demo** profile with SQL, Key Vault, private networking, VPN and VM; it is not the low-cost starting point. Offline CI now validates and scans both roots. The minimal Storage account blocks public data-plane access and has no Private Endpoint, so the core live scan works through ARM while the incident story uses a labeled fixture unless a private data-plane path is separately reviewed.
+
+Read the [demo and cleanup runbook](docs/demo.md) before any Azure apply. It requires checking the actual subscription credit, price, quota, budget, state key and destroy plan. The [architecture](docs/architecture.md), [threat model](docs/threat-model.md), and [rule catalog](docs/controls.md) document the trust boundaries and control status. Phase K's real deployment and cleanup checkpoint is still pending; green offline CI does not complete it.
+
 ## Known limitations
 
 - The CLI provides `doctor`, `scan`, `watch`, Phase F remediation, Phase G SQLite exception governance, and Phase H local JSONL/HTML reporting. Automated lifecycle export is still pending.
@@ -241,7 +248,7 @@ The package version is `0.2.0`. Version tags `vX.Y.Z` from reviewed `main` commi
 - Phase I has an Azure Monitor/KQL adapter, but the lab ingestion and live detection checkpoint remain unverified.
 - Exception state uses local SQLite. Evidence and sanitized HTML reports are local files; there is no remote audit store or authenticated publication workflow.
 - Offline CI and IaC scanning are configured. Phase J OIDC and release workflows still need GitHub CI and live acceptance; CodeQL and secret scanning must be enabled in GitHub Settings where available.
-- Terraform full profile gồm tài nguyên có chi phí như VPN Gateway, VM, SQL, Private Endpoint và Log Analytics.
+- Terraform full profile gồm tài nguyên có chi phí như VPN Gateway, VM, SQL, Private Endpoint và Log Analytics. Phase K minimal profile vẫn có chi phí Storage/Log Analytics và phải được kiểm tra theo subscription thực tế.
 - Chưa có kết quả đối chiếu live với Azure Policy/Prowler; chưa claim coverage theo một CIS control cụ thể.
 
 ## Mốc demo mục tiêu

@@ -40,12 +40,16 @@ jobs:
           --cov-fail-under=80
 
   terraform:
-    name: Terraform syntax and provider validation
+    name: Terraform syntax and provider validation (${{ matrix.root }})
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        root: [azure-minimal-storage, azure-secure-storage]
     defaults:
       run:
-        working-directory: Terraform/azure-secure-storage
+        working-directory: Terraform/${{ matrix.root }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -72,7 +76,7 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           scan-type: config
-          scan-ref: Terraform/azure-secure-storage
+          scan-ref: Terraform
           format: table
           severity: HIGH,CRITICAL
           exit-code: '1'
