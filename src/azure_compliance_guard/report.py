@@ -130,6 +130,18 @@ def _public_data(event_type: str, raw: dict) -> dict:
             if raw.get("identity")
             else None,
             "security_events_evaluated": _count(raw.get("security_events_evaluated")),
+            "operation": raw.get("operation")
+            if raw.get("operation") in {"GetBlob", "ListBlobs", "PutBlob", "DeleteBlob"}
+            else None,
+            "severity": raw.get("severity")
+            if raw.get("severity") in {"NORMAL", "SUSPICIOUS", "ESCALATED_CRITICAL"}
+            else None,
+            "action": "Disable public network access"
+            if raw.get("action") == "disable_public_network_access"
+            else None,
+            "verification": raw.get("verification")
+            if raw.get("verification") in {"PENDING", "VERIFIED", "FAILED"}
+            else None,
         }
     if event_type.startswith("REMEDIATION_"):
         return {
@@ -195,6 +207,10 @@ def public_events(events: list[dict]) -> list[dict]:
                 if collector == "simulated_lifecycle"
                 else "Fixture validation"
                 if collector == "validation_fixture"
+                else "Azure Monitor Blob logs"
+                if collector == "azure_monitor"
+                else "Monitor fixture"
+                if collector == "monitor_fixture"
                 else "Scan",
                 "data": _public_data(event["event_type"], event["data"]),
             }
@@ -343,6 +359,6 @@ def render_report(events: list[dict]) -> str:
     # CSP hash covers only this trusted, static script; no evidence is embedded.
     # https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/script-src
     context["script_hash"] = base64.b64encode(
-        hashlib.sha256(script.group(1).encode("utf-8")).digest()
+        hashlib.sha256(script.group(1).replace("\r\n", "\n").encode("utf-8")).digest()
     ).decode("ascii")
     return environment.get_template("report.html.j2").render(**context)

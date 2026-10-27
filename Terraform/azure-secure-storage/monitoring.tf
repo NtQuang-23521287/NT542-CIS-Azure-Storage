@@ -14,9 +14,10 @@ resource "azurerm_log_analytics_workspace" "law" {
 
 # ── Diagnostic: Storage Account → Log Analytics ───────────────────────────────
 resource "azurerm_monitor_diagnostic_setting" "storage_diag" {
-  name                       = "${var.project}-storage-diag"
-  target_resource_id         = "${azurerm_storage_account.sa.id}/blobServices/default"
-  log_analytics_workspace_id = azurerm_log_analytics_workspace.law.id
+  name                           = "${var.project}-storage-diag"
+  target_resource_id             = "${azurerm_storage_account.sa.id}/blobServices/default"
+  log_analytics_workspace_id     = azurerm_log_analytics_workspace.law.id
+  log_analytics_destination_type = "Dedicated"
 
   enabled_log {
     category = "StorageRead"

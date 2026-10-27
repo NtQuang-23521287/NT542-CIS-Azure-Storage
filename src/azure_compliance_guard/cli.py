@@ -21,6 +21,16 @@ from azure_compliance_guard.collectors import (
 from azure_compliance_guard.doctor import collect_doctor_checks
 from azure_compliance_guard.evidence import append_events, make_event, read_events
 from azure_compliance_guard.exceptions import ExceptionRepository
+from azure_compliance_guard.incident import (
+    TrustedNetworks,
+    process_incidents,
+    verify_containment,
+)
+from azure_compliance_guard.monitor import (
+    make_logs_client,
+    normalize_storage_rows,
+    query_storage_events,
+)
 from azure_compliance_guard.remediation import (
     AzureExecutor,
     InvalidPlanError,
@@ -174,6 +184,34 @@ def build_parser() -> argparse.ArgumentParser:
                 "--status", choices=("REQUESTED", "ACTIVE", "EXPIRED", "REVOKED")
             )
             command.add_argument("--resource-id")
+
+    incident = subparsers.add_parser("incident", help="evaluate Storage log incidents")
+    incident_commands = incident.add_subparsers(dest="incident_command", required=True)
+    incident_scan = incident_commands.add_parser(
+        "scan", help="query Blob logs or an offline monitor fixture"
+    )
+    incident_scan.add_argument(
+        "--source", choices=("azure", "fixture"), default="azure"
+    )
+    incident_scan.add_argument("--fixture", type=Path)
+    incident_scan.add_argument("--workspace-id")
+    incident_scan.add_argument("--account", required=True)
+    incident_scan.add_argument("--resource-id", required=True)
+    incident_scan.add_argument("--lookback-minutes", type=_positive_int, default=45)
+    incident_scan.add_argument("--trusted-cidr", action="append", required=True)
+    incident_scan.add_argument("--exceptions-db", required=True, type=Path)
+    incident_scan.add_argument("--state-db", required=True, type=Path)
+    incident_scan.add_argument("--evidence", required=True, type=Path)
+    incident_verify = incident_commands.add_parser(
+        "verify", help="re-collect Storage state after approved containment"
+    )
+    incident_verify.add_argument(
+        "--source", choices=("azure", "fixture"), default="azure"
+    )
+    incident_verify.add_argument("--fixture", type=Path)
+    incident_verify.add_argument("--resource-id", required=True)
+    incident_verify.add_argument("--event-key", required=True)
+    incident_verify.add_argument("--evidence", required=True, type=Path)
     return parser
 
 
@@ -633,6 +671,86 @@ def _run_report(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
+def _run_incident(args: argparse.Namespace) -> int:
+    policy = TrustedNetworks(args.trusted_cidr)
+    if args.source == "fixture":
+        if args.fixture is None or args.workspace_id is not None:
+            raise ValueError("fixture source requires --fixture and no workspace ID")
+        if args.fixture.stat().st_size > 1_048_576:
+            raise ValueError("monitor fixture exceeds 1 MiB")
+        document = json.loads(args.fixture.read_text(encoding="utf-8"))
+        if (
+            not isinstance(document, dict)
+            or set(document) != {"columns", "rows"}
+            or not isinstance(document["columns"], list)
+            or not isinstance(document["rows"], list)
+        ):
+            raise ValueError("monitor fixture must contain columns and rows")
+        events = normalize_storage_rows(
+            document["columns"], document["rows"], args.account, args.resource_id
+        )
+    else:
+        if args.fixture is not None or not args.workspace_id:
+            raise ValueError("Azure source requires --workspace-id and no fixture")
+        client = make_logs_client()
+        try:
+            events = query_storage_events(
+                client,
+                args.workspace_id,
+                args.account,
+                args.resource_id,
+                args.lookback_minutes,
+            )
+        finally:
+            client.close()
+    result = process_incidents(
+        events,
+        policy,
+        ExceptionRepository(args.exceptions_db),
+        args.state_db,
+        args.evidence,
+        mode=args.source,
+    )
+    findings = sum(item["severity"] != "NORMAL" for item in result)
+    print(
+        json.dumps(
+            {
+                "source": args.source,
+                "queried": len(events),
+                "processed": len(result),
+                "escalated": sum(
+                    item["severity"] == "ESCALATED_CRITICAL" for item in result
+                ),
+                "results": result,
+            },
+            indent=2,
+        )
+    )
+    return EXIT_FINDINGS if findings else EXIT_OK
+
+
+def _run_incident_verify(args: argparse.Namespace) -> int:
+    if args.source == "fixture":
+        if args.fixture is None:
+            raise ValueError("fixture verification requires --fixture")
+        states = FixtureStorageCollector(args.fixture).collect()
+    else:
+        if args.fixture is not None:
+            raise ValueError("Azure verification does not accept a fixture")
+        states = _azure_states("storage")
+    if len(states) != 1:
+        raise ValueError("verification requires exactly one Storage resource")
+    result = verify_containment(
+        args.event_key,
+        args.resource_id,
+        states[0],
+        args.evidence,
+        mode=args.source,
+    )
+    print(json.dumps({"event_key": args.event_key, "verification": result}))
+    return EXIT_OK if result == "VERIFIED" else EXIT_FINDINGS
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
@@ -642,6 +760,12 @@ def main(argv: list[str] | None = None) -> int:
             return _run_watch(args)
         if args.command == "exception":
             return _run_exception(args)
+        if args.command == "incident":
+            return (
+                _run_incident_verify(args)
+                if args.incident_command == "verify"
+                else _run_incident(args)
+            )
         if args.command == "report":
             return _run_report(args)
         if args.command == "remediation":

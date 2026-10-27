@@ -116,7 +116,7 @@
         <div class="section-heading"><h2 id="timeline-title">Timeline</h2><p>Events in timestamp order</p></div>
         <div class="panel"><ol class="timeline">
           {% for event in timeline %}
-          <li><time datetime="{{ event.timestamp }}">{{ event.timestamp }}</time><div class="event">{{ event.event_type|replace('_', ' ') }}</div><div class="detail">{{ event.source }} · {{ event.collector }}{% if event.resource %} · {{ event.resource.name }}{% endif %}</div></li>
+          <li><time datetime="{{ event.timestamp }}">{{ event.timestamp }}</time><div class="event">{{ event.event_type|replace('_', ' ') }}</div><div class="detail">{{ event.source }} · {{ event.collector }}{% if event.resource %} · {{ event.resource.name }}{% endif %}{% if event.data.get('operation') %} · {{ event.data.operation }}{% endif %}{% if event.data.get('severity') %} · {{ event.data.severity }}{% endif %}{% if event.data.get('action') %} · {{ event.data.action }}{% endif %}{% if event.data.get('verification') %} · verification {{ event.data.verification }}{% endif %}</div></li>
           {% endfor %}
         </ol></div>
       </section>

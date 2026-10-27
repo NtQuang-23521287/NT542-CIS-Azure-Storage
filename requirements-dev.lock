@@ -6,6 +6,7 @@ azure-core==1.41.0 \
     # via
     #   azure-identity
     #   azure-mgmt-core
+    #   azure-monitor-query
 azure-identity==1.26.0 \
     --hash=sha256:3c60d9682b3ac01507388d474cb5a5ffbe54152a96b6cdcaa7013da9315cf186 \
     --hash=sha256:61b4538b87df10d2d6d44b77cd5ea28a8929fd4929d58b45bf3f230f7daba02e
@@ -23,6 +24,10 @@ azure-mgmt-resource==25.0.0 \
 azure-mgmt-storage==25.3.0 \
     --hash=sha256:bc4fe1ea26f8c58bf9ca6b365095cfd326d65cefa135dd5f29e09353cb6313ec \
     --hash=sha256:cb26707847202a4eb34d6d4ba621d9f4d0b322b2af1565da6109d2a1ec161b8e
+    # via nt542-cis-azure-storage (pyproject.toml)
+azure-monitor-query==2.0.0 \
+    --hash=sha256:7b05f2fcac4fb67fc9f77a7d4c5d98a0f3099fb73b57c69ec1b080773994671b \
+    --hash=sha256:8f52d581271d785e12f49cd5aaa144b8910fb843db2373855a7ef94c7fc462ea
     # via nt542-cis-azure-storage (pyproject.toml)
 certifi==2026.10.19 \
     --hash=sha256:035c1e85572b141bf1c3a3eff0e33a8eb74917522f2559075ff8d2fea780a1ae \
@@ -509,6 +514,7 @@ isodate==0.7.2 \
     # via
     #   azure-mgmt-resource
     #   azure-mgmt-storage
+    #   azure-monitor-query
 jinja2==3.1.6 \
     --hash=sha256:0137fb05990d35f1275a587e9aee6d56da821fc83491a0fb838183be43f66d6d \
     --hash=sha256:85ece4451f492d0c13c5dd7c13a64681a86afae63a5f347908daf103ce6d2f67
@@ -821,6 +827,7 @@ typing-extensions==4.16.0 \
     #   azure-identity
     #   azure-mgmt-resource
     #   azure-mgmt-storage
+    #   azure-monitor-query
 urllib3==2.8.0 \
     --hash=sha256:0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3 \
     --hash=sha256:63bf2ead4c879426ebf22ef2a781eeb4aa3b4ae798a0435506f8687fd5bb9b63
