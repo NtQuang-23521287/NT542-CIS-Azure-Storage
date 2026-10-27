@@ -1,0 +1,73 @@
+name: Manual Azure plan
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: azure-plan-lab
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: azure-plan
+    permissions:
+      contents: read
+      id-token: write
+    defaults:
+      run:
+        working-directory: Terraform/azure-secure-storage
+    env:
+      ARM_CLIENT_ID: ${{ secrets.AZURE_PLAN_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      ARM_USE_OIDC: 'true'
+      ARM_USE_AZUREAD: 'true'
+      TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_vpn_client_root_certificate_data: ${{ secrets.TF_VAR_VPN_CLIENT_ROOT_CERTIFICATE_DATA }}
+      TF_VAR_jumpbox_ssh_public_key: ${{ secrets.TF_VAR_JUMPBOX_SSH_PUBLIC_KEY }}
+      TF_STATE_ACCOUNT: ${{ vars.TF_STATE_ACCOUNT }}
+      TF_STATE_CONTAINER: ${{ vars.TF_STATE_CONTAINER }}
+      TF_STATE_KEY: ${{ vars.TF_STATE_KEY }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Check required configuration
+        shell: bash
+        run: |
+          for name in ARM_CLIENT_ID ARM_TENANT_ID ARM_SUBSCRIPTION_ID TF_VAR_vpn_client_root_certificate_data TF_VAR_jumpbox_ssh_public_key TF_STATE_ACCOUNT TF_STATE_CONTAINER TF_STATE_KEY; do
+            if [[ -z "${!name}" ]]; then
+              echo "Missing environment configuration: $name" >&2
+              exit 1
+            fi
+          done
+      - uses: azure/login@0949e32778441b2c442592b7a0e6313466dc8f29 # v3.0.2
+        with:
+          client-id: ${{ secrets.AZURE_PLAN_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      - name: Require existing shared state
+        shell: bash
+        run: |
+          exists="$(az storage blob exists --auth-mode login --account-name "$TF_STATE_ACCOUNT" --container-name "$TF_STATE_CONTAINER" --name "$TF_STATE_KEY" --query exists -o tsv)"
+          if [[ "${exists,,}" != "true" ]]; then
+            echo 'Remote state blob is absent; migrate existing lab state before planning.' >&2
+            exit 1
+          fi
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: 1.14.9
+      - name: Initialize locked providers and shared backend
+        run: >-
+          terraform init -input=false -lockfile=readonly
+          -backend-config="storage_account_name=$TF_STATE_ACCOUNT"
+          -backend-config="container_name=$TF_STATE_CONTAINER"
+          -backend-config="key=$TF_STATE_KEY"
+      - name: Plan only
+        run: terraform plan -input=false -no-color -lock-timeout=5m

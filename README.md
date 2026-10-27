@@ -227,14 +227,20 @@ SQL_SERVER_NAME
 
 Không commit `.env`, Terraform state, `*.tfvars`, log, database hoặc private evidence.
 
+## Phase J: manual Azure plan and releases
+
+PR CI stays offline. The separate `Manual Azure plan` workflow runs only by manual dispatch on `main`, with the `azure-plan` environment and short-lived OIDC authentication. It requires an existing remote state blob; Azure identity, environment protection, scoped RBAC, and state migration still need operator setup and a live lab run. There is no CI `apply` or `destroy`. See [Phase J operations](docs/phase-j-operations.md) for exact setup, scanner/remediator boundaries, and release verification.
+
+The package version is `0.2.0`. Version tags `vX.Y.Z` from reviewed `main` commits build wheel/source artifacts, generate an SBOM and provenance attestations, and open a draft GitHub release for maintainer review. The first tag workflow run is still pending.
+
 ## Known limitations
 
 - The CLI provides `doctor`, `scan`, `watch`, Phase F remediation, Phase G SQLite exception governance, and Phase H local JSONL/HTML reporting. Automated lifecycle export is still pending.
 - Storage, Key Vault và SQL đã có 17 rule YAML schema-v1; mapping CIS/Azure Policy/Prowler vẫn chưa được xác minh bằng nguồn pinned và lab live.
 - Approval file Phase F là xác nhận cục bộ tự khai báo, chưa có xác thực danh tính hoặc chữ ký số. Chưa có rollback hay ledger bền vững chống chạy lặp sau lỗi không rõ kết quả.
-- Incident detection vẫn dựa trên fixture local, chưa phải Azure Monitor/KQL.
+- Phase I has an Azure Monitor/KQL adapter, but the lab ingestion and live detection checkpoint remain unverified.
 - Exception state uses local SQLite. Evidence and sanitized HTML reports are local files; there is no remote audit store or authenticated publication workflow.
-- Offline CI và IaC scan đã được cấu hình ở Phase D; Phase G PR đã qua CI theo kết quả được báo cáo. Phase H cần CI trên PR mới; OIDC và CodeQL/default secret scanning vẫn cần triển khai hoặc bật trong GitHub Settings.
+- Offline CI and IaC scanning are configured. Phase J OIDC and release workflows still need GitHub CI and live acceptance; CodeQL and secret scanning must be enabled in GitHub Settings where available.
 - Terraform full profile gồm tài nguyên có chi phí như VPN Gateway, VM, SQL, Private Endpoint và Log Analytics.
 - Chưa có kết quả đối chiếu live với Azure Policy/Prowler; chưa claim coverage theo một CIS control cụ thể.
 

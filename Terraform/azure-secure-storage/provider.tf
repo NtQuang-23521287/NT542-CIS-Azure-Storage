@@ -1,6 +1,10 @@
 terraform {
   required_version = ">= 1.3.0"
 
+  # Configured at init time; never commit state or backend credentials.
+  # https://developer.hashicorp.com/terraform/language/backend/azurerm
+  backend "azurerm" {}
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
